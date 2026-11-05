@@ -1,24 +1,42 @@
+import mongoose from 'mongoose';
+import { User } from '../models/User.js';
+import { Transaction } from '../models/Transaction.js';
 import { store } from '../data/store.js';
 
-export const getMembers = (req, res, next) => {
+export const getMembers = async (req, res, next) => {
   try {
-    const users = store.get('users') || [];
-    const safeUsers = users.map(({ passwordHash, ...user }) => user);
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    let users = [];
+
+    if (isMongoConnected) {
+      users = await User.find().lean();
+    } else {
+      users = store.get('users') || [];
+    }
+
+    const safeUsers = users.map(({ passwordHash, _id, __v, ...user }) => user);
     res.status(200).json({ success: true, data: safeUsers });
   } catch (error) {
     next(error);
   }
 };
 
-export const getBalances = (req, res, next) => {
+export const getBalances = async (req, res, next) => {
   try {
-    const transactions = store.get('transactions') || [];
-    const users = store.get('users') || [];
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    let transactions = [];
+    let users = [];
 
-    // Filter split transactions
+    if (isMongoConnected) {
+      transactions = await Transaction.find().lean();
+      users = await User.find().lean();
+    } else {
+      transactions = store.get('transactions') || [];
+      users = store.get('users') || [];
+    }
+
     const splitTxs = transactions.filter(t => t.isSplit);
 
-    // Calculate spend per member
     const spentByMember = {};
     users.forEach(u => {
       spentByMember[u.name.split(' ')[0]] = 0; // 'Alex', 'Sam', 'Maya'
@@ -33,7 +51,6 @@ export const getBalances = (req, res, next) => {
     const memberCount = Object.keys(spentByMember).length || 1;
     const equalShare = Math.round(totalSplit / memberCount);
 
-    // Balance: > 0 means gets back, < 0 means owes
     const balances = Object.keys(spentByMember).map(name => {
       const paid = spentByMember[name];
       const net = paid - equalShare;
@@ -70,4 +87,3 @@ export const settleBalances = (req, res, next) => {
     next(error);
   }
 };
-

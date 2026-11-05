@@ -1,31 +1,41 @@
-# SHAKA — Express Backend Service
+# SHAKA — Express + MongoDB Backend Service
 
-REST API backend service for the **SHAKA** Personal Finance & Shared Ledger platform, built with **Node.js** and **Express**.
+REST API backend service for the **SHAKA** Personal Finance & Shared Ledger platform, built with **Node.js**, **Express**, and **MongoDB (Mongoose)**.
 
 ---
 
 ## ⚡ Quick Start
 
-### 1. Install Dependencies
+### 1. Start Local MongoDB
+Ensure your local MongoDB daemon is running:
+- **Windows Service**: `net start MongoDB` (or run MongoDB Compass)
+- **Direct CLI**: `mongod --dbpath <data-folder>`
+
+Default connection URI:
+```env
+MONGODB_URI=mongodb://127.0.0.1:27017/shaka
+```
+
+### 2. Install Dependencies
 ```bash
 cd backend
 npm install
-```
-
-### 2. Environment Variables
-Copy `.env.example` to `.env` (a ready `.env` has already been created for you):
-```env
-PORT=5000
-NODE_ENV=development
-JWT_SECRET=shaka_quiet_luxury_secret_key_2026
-CLIENT_ORIGIN=http://localhost:5173
 ```
 
 ### 3. Run Development Server
 ```bash
 npm run dev
 ```
-The server will start on `http://localhost:5000` with hot-reloading.
+The server will start on `http://localhost:5000` with hot-reloading. On startup, it automatically seeds initial mock data (users, transactions, budget categories, limits) directly into MongoDB if collections are empty.
+
+---
+
+## 🍃 MongoDB Models
+
+- **`User`** (`backend/src/models/User.js`): Accounts, credentials, roles, initials, avatar colors
+- **`Transaction`** (`backend/src/models/Transaction.js`): Expenses, date/time, category, user, split flag
+- **`BudgetCategory`** (`backend/src/models/BudgetCategory.js`): Spending limits, amounts spent, category colors, threshold health status
+- **`Setting`** (`backend/src/models/Setting.js`): Global monthly limit and available category icons
 
 ---
 
@@ -63,9 +73,3 @@ The server will start on `http://localhost:5000` with hot-reloading.
 - `GET /api/household/members` — List household members and roles
 - `GET /api/household/balances` — Calculate split share and who owes whom
 - `POST /api/household/settle` — Mark split balances as settled
-
----
-
-## 💾 Data Persistence
-
-Initial state is seeded from the Stitch design specifications into `backend/data/db.json`. All additions and updates persist to this local JSON database file automatically.

@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import mongoose from 'mongoose';
 import { config } from '../config/index.js';
+import { User } from '../models/User.js';
 import { store } from '../data/store.js';
 
 export const login = async (req, res, next) => {
@@ -14,14 +16,30 @@ export const login = async (req, res, next) => {
       });
     }
 
-    const users = store.get('users') || [];
-    let user = users.find(
-      u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()
-    );
+    let user = null;
+    const isMongoConnected = mongoose.connection.readyState === 1;
 
-    // If user not found but default demo user requested or testing:
+    if (isMongoConnected) {
+      user = await User.findOne({
+        $or: [
+          { username: new RegExp(`^${username}$`, 'i') },
+          { email: new RegExp(`^${username}$`, 'i') },
+        ],
+      });
+    } else {
+      const users = store.get('users') || [];
+      user = users.find(
+        u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()
+      );
+    }
+
+    // Default demo fallback if testing
     if (!user && (username.toLowerCase() === 'alex_rivera' || username.toLowerCase() === 'alex')) {
-      user = users[0];
+      if (isMongoConnected) {
+        user = await User.findOne();
+      } else {
+        user = (store.get('users') || [])[0];
+      }
     }
 
     if (!user) {
@@ -50,7 +68,10 @@ export const login = async (req, res, next) => {
       { expiresIn: '7d' }
     );
 
-    const { passwordHash, ...safeUser } = user;
+    const safeUser = user.toObject ? user.toObject() : { ...user };
+    delete safeUser.passwordHash;
+    delete safeUser._id;
+    delete safeUser.__v;
 
     res.status(200).json({
       success: true,
@@ -63,14 +84,29 @@ export const login = async (req, res, next) => {
   }
 };
 
-export const getMe = (req, res) => {
-  const users = store.get('users') || [];
-  const user = req.user || users[0];
-  const { passwordHash, ...safeUser } = user;
-  res.status(200).json({
-    success: true,
-    user: safeUser,
-  });
+export const getMe = async (req, res, next) => {
+  try {
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    let user = null;
+
+    if (isMongoConnected) {
+      user = await User.findOne();
+    } else {
+      user = (store.get('users') || [])[0];
+    }
+
+    const safeUser = user ? (user.toObject ? user.toObject() : { ...user }) : {};
+    delete safeUser.passwordHash;
+    delete safeUser._id;
+    delete safeUser.__v;
+
+    res.status(200).json({
+      success: true,
+      user: safeUser,
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 export const forgotPassword = (req, res) => {
@@ -79,7 +115,6 @@ export const forgotPassword = (req, res) => {
     return res.status(400).json({ success: false, message: 'Email is required' });
   }
 
-  // Simulate password reset link generation
   res.status(200).json({
     success: true,
     message: `A password reset link has been dispatched to ${email}`,
@@ -88,7 +123,7 @@ export const forgotPassword = (req, res) => {
 
 export const changePassword = async (req, res, next) => {
   try {
-    const { currentPassword, newPassword } = req.body;
+    const { newPassword } = req.body;
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({
         success: false,
@@ -99,10 +134,13 @@ export const changePassword = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(newPassword, salt);
 
-    // Update in store
-    store.update('users', users =>
-      users.map((u, i) => (i === 0 ? { ...u, passwordHash: hashed } : u))
-    );
+    if (mongoose.connection.readyState === 1) {
+      await User.findOneAndUpdate({}, { passwordHash: hashed });
+    } else {
+      store.update('users', users =>
+        users.map((u, i) => (i === 0 ? { ...u, passwordHash: hashed } : u))
+      );
+    }
 
     res.status(200).json({
       success: true,
@@ -112,4 +150,3 @@ export const changePassword = async (req, res, next) => {
     next(error);
   }
 };
-

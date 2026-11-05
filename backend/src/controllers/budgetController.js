@@ -1,7 +1,23 @@
+import mongoose from 'mongoose';
+import { BudgetCategory } from '../models/BudgetCategory.js';
+import { Transaction } from '../models/Transaction.js';
+import { Setting } from '../models/Setting.js';
 import { store } from '../data/store.js';
 
-export const getBudgetCategories = (req, res, next) => {
+export const getBudgetCategories = async (req, res, next) => {
   try {
+    const isMongoConnected = mongoose.connection.readyState === 1;
+
+    if (isMongoConnected) {
+      const categories = await BudgetCategory.find().lean();
+      const sanitized = categories.map(({ _id, __v, ...item }) => item);
+      return res.status(200).json({
+        success: true,
+        count: sanitized.length,
+        data: sanitized,
+      });
+    }
+
     const categories = store.get('budgetCategories') || [];
     res.status(200).json({
       success: true,
@@ -13,7 +29,7 @@ export const getBudgetCategories = (req, res, next) => {
   }
 };
 
-export const addBudgetCategory = (req, res, next) => {
+export const addBudgetCategory = async (req, res, next) => {
   try {
     const { name, limit, color } = req.body;
     const trimmedName = (name || '').trim();
@@ -28,11 +44,18 @@ export const addBudgetCategory = (req, res, next) => {
     const limitVal = Number(limit) || 5000;
     const catColor = color || '#c9b27c';
     const newId = `cat-${Date.now()}`;
+    const isMongoConnected = mongoose.connection.readyState === 1;
 
-    const transactions = store.get('transactions') || [];
-    const existingSpent = transactions
-      .filter(t => t.category.toLowerCase() === trimmedName.toLowerCase())
-      .reduce((sum, t) => sum + Number(t.amount), 0);
+    let existingSpent = 0;
+    if (isMongoConnected) {
+      const txs = await Transaction.find({ category: new RegExp(`^${trimmedName}$`, 'i') });
+      existingSpent = txs.reduce((sum, t) => sum + Number(t.amount), 0);
+    } else {
+      const transactions = store.get('transactions') || [];
+      existingSpent = transactions
+        .filter(t => t.category.toLowerCase() === trimmedName.toLowerCase())
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    }
 
     const status =
       existingSpent > limitVal ? 'Limit reached' : existingSpent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
@@ -50,9 +73,15 @@ export const addBudgetCategory = (req, res, next) => {
       statusColor,
     };
 
-    store.update('budgetCategories', prev => [...(prev || []), newCategory]);
+    if (isMongoConnected) {
+      await BudgetCategory.create(newCategory);
+      await Setting.findOneAndUpdate(
+        { key: 'global' },
+        { $addToSet: { availableCategories: { name: trimmedName, color: catColor } } }
+      );
+    }
 
-    // Also add to availableCategories if missing
+    store.update('budgetCategories', prev => [...(prev || []), newCategory]);
     store.update('availableCategories', prev => {
       const list = prev || [];
       if (list.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
@@ -71,10 +100,46 @@ export const addBudgetCategory = (req, res, next) => {
   }
 };
 
-export const updateBudgetCategory = (req, res, next) => {
+export const updateBudgetCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, limit, color } = req.body;
+    const isMongoConnected = mongoose.connection.readyState === 1;
+
+    if (isMongoConnected) {
+      const existing = await BudgetCategory.findOne({ id });
+      if (!existing) {
+        return res.status(404).json({ success: false, message: 'Category not found' });
+      }
+
+      const updatedName = name !== undefined && name.trim() ? name.trim() : existing.name;
+      const limitVal =
+        limit !== undefined && !isNaN(limit) && Number(limit) > 0 ? Number(limit) : existing.limit;
+      const catColor = color || existing.color;
+
+      const status =
+        existing.spent > limitVal ? 'Limit reached' : existing.spent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
+      const statusColor =
+        status === 'Limit reached' ? '#d97070' : status === 'Near limit' ? '#d4a359' : '#8fb39a';
+
+      existing.name = updatedName;
+      existing.category = updatedName;
+      existing.limit = limitVal;
+      existing.color = catColor;
+      existing.status = status;
+      existing.statusColor = statusColor;
+      await existing.save();
+
+      const sanitized = existing.toObject();
+      delete sanitized._id;
+      delete sanitized.__v;
+
+      return res.status(200).json({
+        success: true,
+        message: 'Category updated successfully',
+        data: sanitized,
+      });
+    }
 
     const categories = store.get('budgetCategories') || [];
     const index = categories.findIndex(c => c.id === id);
@@ -107,16 +172,6 @@ export const updateBudgetCategory = (req, res, next) => {
     categories[index] = updated;
     store.set('budgetCategories', categories);
 
-    if (name !== undefined && name.trim()) {
-      store.update('availableCategories', prev =>
-        (prev || []).map(c =>
-          c.name.toLowerCase() === existing.name.toLowerCase()
-            ? { ...c, name: updatedName, color: catColor }
-            : c
-        )
-      );
-    }
-
     res.status(200).json({
       success: true,
       message: 'Category updated successfully',
@@ -127,20 +182,20 @@ export const updateBudgetCategory = (req, res, next) => {
   }
 };
 
-export const deleteBudgetCategory = (req, res, next) => {
+export const deleteBudgetCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const categories = store.get('budgetCategories') || [];
-    const catToDelete = categories.find(c => c.id === id);
+    const isMongoConnected = mongoose.connection.readyState === 1;
 
-    if (!catToDelete) {
-      return res.status(404).json({ success: false, message: 'Category not found' });
+    if (isMongoConnected) {
+      const deleted = await BudgetCategory.findOneAndDelete({ id });
+      if (!deleted) {
+        return res.status(404).json({ success: false, message: 'Category not found' });
+      }
     }
 
+    const categories = store.get('budgetCategories') || [];
     store.set('budgetCategories', categories.filter(c => c.id !== id));
-    store.update('availableCategories', prev =>
-      (prev || []).filter(c => c.name.toLowerCase() !== catToDelete.name.toLowerCase())
-    );
 
     res.status(200).json({
       success: true,
@@ -151,8 +206,16 @@ export const deleteBudgetCategory = (req, res, next) => {
   }
 };
 
-export const getMonthlyLimit = (req, res, next) => {
+export const getMonthlyLimit = async (req, res, next) => {
   try {
+    const isMongoConnected = mongoose.connection.readyState === 1;
+    if (isMongoConnected) {
+      const setting = await Setting.findOne({ key: 'global' });
+      if (setting && setting.monthlyLimit) {
+        return res.status(200).json({ success: true, monthlyLimit: setting.monthlyLimit });
+      }
+    }
+
     const limit = store.get('monthlyLimit') || 30000;
     res.status(200).json({ success: true, monthlyLimit: limit });
   } catch (error) {
@@ -160,7 +223,7 @@ export const getMonthlyLimit = (req, res, next) => {
   }
 };
 
-export const updateMonthlyLimit = (req, res, next) => {
+export const updateMonthlyLimit = async (req, res, next) => {
   try {
     const { monthlyLimit } = req.body;
     const num = Number(monthlyLimit);
@@ -170,6 +233,14 @@ export const updateMonthlyLimit = (req, res, next) => {
         success: false,
         message: 'Valid positive monthly limit is required',
       });
+    }
+
+    if (mongoose.connection.readyState === 1) {
+      await Setting.findOneAndUpdate(
+        { key: 'global' },
+        { monthlyLimit: num },
+        { upsert: true }
+      );
     }
 
     store.set('monthlyLimit', num);
@@ -183,12 +254,18 @@ export const updateMonthlyLimit = (req, res, next) => {
   }
 };
 
-export const getAvailableCategories = (req, res, next) => {
+export const getAvailableCategories = async (req, res, next) => {
   try {
+    if (mongoose.connection.readyState === 1) {
+      const setting = await Setting.findOne({ key: 'global' }).lean();
+      if (setting && setting.availableCategories && setting.availableCategories.length) {
+        return res.status(200).json({ success: true, data: setting.availableCategories });
+      }
+    }
+
     const list = store.get('availableCategories') || [];
     res.status(200).json({ success: true, data: list });
   } catch (error) {
     next(error);
   }
 };
-
