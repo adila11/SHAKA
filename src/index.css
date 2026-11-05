@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --color-app-dark: #0e0e10;
+  --color-app-light: #f6f5f2;
+
+  --color-surface-dark: #17171a;
+  --color-surface-dark-elevated: #1f1f24;
+  --color-surface-light: #ffffff;
+  --color-surface-light-elevated: #f0eee9;
+
+  --color-border-dark: #26262b;
+  --color-border-dark-subtle: #1b1b1f;
+  --color-border-light: #e5e3dc;
+
+  --color-txt-dark: #e8e8ea;
+  --color-txt-dark-muted: #8a8a93;
+  --color-txt-dark-faint: #52525a;
+  --color-txt-light: #18181b;
+  --color-txt-light-muted: #71717a;
+  --color-txt-light-faint: #a1a1aa;
+
+  --color-accent-gold: #c9b27c;
+  --color-accent-gold-hover: #bba46e;
+  --color-accent-gold-light: #a68d55;
+
+  --color-status-sage: #8fb39a;
+  --color-status-amber: #d4a359;
+  --color-status-rose: #d97070;
+}
+
+/* Base custom styles */
+* {
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.phone-viewport {
+  width: 390px;
+  height: 844px;
+  min-width: 390px;
+  min-height: 844px;
+  max-width: 390px;
+  max-height: 844px;
+}

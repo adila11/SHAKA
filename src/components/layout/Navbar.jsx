@@ -1,0 +1,173 @@
+import {
+  LayoutDashboard,
+  BookOpen,
+  PieChart,
+  User,
+  Plus,
+  Moon,
+  Sun,
+  Smartphone,
+  Monitor
+} from 'lucide-react';
+import { useFinance } from '../../context/FinanceContext';
+import { useTheme } from '../../context/ThemeContext';
+
+export default function Navbar() {
+  const {
+    currentScreen,
+    setCurrentScreen,
+    setIsAddExpenseModalOpen,
+    currentUser,
+    viewMode,
+    setViewMode,
+    isLoggedIn,
+    setIsLoggedIn,
+  } = useFinance();
+  const { setTheme, isDark } = useTheme();
+
+  const navLinks = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'ledger', label: 'Ledger', icon: BookOpen },
+    { id: 'budget', label: 'Budget Planner', icon: PieChart },
+    { id: 'profile', label: 'Settings & Profile', icon: User },
+  ];
+
+  const handleNavClick = (screenId) => {
+    setCurrentScreen(screenId);
+  };
+
+  return (
+    <header className="sticky top-0 z-40 w-full border-b transition-colors backdrop-blur-md bg-[#0e0e10]/90 dark:bg-[#0e0e10]/90 border-[#26262b] dark:border-[#26262b]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        {/* Brand identity */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => handleNavClick('dashboard')}
+            className="flex items-center gap-3 text-left group cursor-pointer"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#c9b27c] to-[#917d50] flex items-center justify-center font-black text-neutral-950 text-base shadow-md shadow-[#c9b27c]/25 select-none transition-transform group-hover:scale-105">
+              S
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-base tracking-tight text-[#e8e8ea] group-hover:text-[#c9b27c] transition-colors">
+                  SHAKA
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-[#c9b27c]/15 text-[#c9b27c] border border-[#c9b27c]/30 font-semibold hidden sm:inline-block">
+                  LEDGER
+                </span>
+              </div>
+              <p className="text-[11px] text-[#8a8a93] hidden md:block">
+                Quiet Luxury Personal Finance
+              </p>
+            </div>
+          </button>
+        </div>
+
+        {/* Desktop Navigation Links */}
+        {isLoggedIn && (
+          <nav className="hidden md:flex items-center gap-1 bg-[#17171a] border border-[#26262b] p-1 rounded-xl">
+            {navLinks.map((link) => {
+              const Icon = link.icon;
+              const isActive = currentScreen === link.id;
+              return (
+                <button
+                  key={link.id}
+                  type="button"
+                  onClick={() => handleNavClick(link.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-[#c9b27c] text-neutral-950 shadow-sm'
+                      : 'text-[#8a8a93] hover:text-[#e8e8ea] hover:bg-[#202024]'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{link.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        )}
+
+        {/* Actions & Utilities */}
+        <div className="flex items-center gap-2.5">
+          {/* Quick Add Expense Button */}
+          {isLoggedIn && (
+            <button
+              type="button"
+              onClick={() => setIsAddExpenseModalOpen(true)}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Plus className="w-4 h-4 stroke-[3]" />
+              <span className="hidden sm:inline">Add Expense</span>
+            </button>
+          )}
+
+          {/* View Mode Toggle: Responsive Page vs Stitch Phone Mockup */}
+          <div className="bg-[#17171a] border border-[#26262b] p-1 rounded-xl flex items-center gap-1">
+            <button
+              type="button"
+              title="Full Responsive Web Page"
+              onClick={() => setViewMode('page')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'page'
+                  ? 'bg-[#202024] text-[#c9b27c] border border-[#c9b27c]/30'
+                  : 'text-[#8a8a93] hover:text-[#e8e8ea]'
+              }`}
+            >
+              <Monitor className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              title="Stitch Mobile Phone Showcase"
+              onClick={() => setViewMode('all')}
+              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                viewMode === 'all'
+                  ? 'bg-[#202024] text-[#c9b27c] border border-[#c9b27c]/30'
+                  : 'text-[#8a8a93] hover:text-[#e8e8ea]'
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Theme switcher */}
+          <button
+            type="button"
+            title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
+            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            className="p-2 rounded-xl border border-[#26262b] bg-[#17171a] text-[#8a8a93] hover:text-[#e8e8ea] hover:border-[#c9b27c]/40 transition-colors cursor-pointer"
+          >
+            {isDark ? <Sun className="w-4 h-4 text-[#c9b27c]" /> : <Moon className="w-4 h-4 text-[#c9b27c]" />}
+          </button>
+
+          {/* User profile avatar badge */}
+          {isLoggedIn ? (
+            <button
+              type="button"
+              onClick={() => handleNavClick('profile')}
+              className="flex items-center gap-2 pl-1 group cursor-pointer"
+            >
+              <div className="w-8 h-8 rounded-full border border-[#26262b] bg-[#17171a] group-hover:border-[#c9b27c] text-[#c9b27c] font-bold text-xs flex items-center justify-center transition-colors shadow-sm">
+                {currentUser.initials}
+              </div>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setIsLoggedIn(true);
+                handleNavClick('dashboard');
+              }}
+              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#c9b27c] text-neutral-950 hover:bg-[#bba46e] transition-colors"
+            >
+              Log In
+            </button>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
