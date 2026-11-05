@@ -5,9 +5,7 @@ import {
   Moon,
   LogOut,
   ChevronRight,
-  Users,
   Coins,
-  CheckCircle2,
   UserCheck
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -38,13 +36,13 @@ export default function ProfilePage() {
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#c9b27c]/15 text-[#c9b27c] border border-[#c9b27c]/30">
                 Verified Account
               </span>
-              <span className="text-xs text-[#8a8a93]">Multi-User Instance #3811</span>
+              <span className="text-xs text-[#8a8a93]">SHAKA Instance #3811</span>
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Settings & Account
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Manage your personal credentials, household member access, and app preferences.
+              Manage your personal credentials, security settings, and app preferences.
             </p>
           </div>
         </div>
@@ -52,7 +50,7 @@ export default function ProfilePage() {
 
       {/* Responsive 2-Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column (4 cols on desktop): Member Profile & Household Sync */}
+        {/* Left Column (4 cols on desktop): Member Profile */}
         <div className="lg:col-span-4 space-y-6">
           {/* Profile Card */}
           <div
@@ -95,80 +93,10 @@ export default function ProfilePage() {
                 }`}
               >
                 <span className="text-[10px] text-[#8a8a93] uppercase tracking-wider block">
-                  Split Ratio
+                  Status
                 </span>
                 <span className={`text-lg font-bold font-mono text-[#8fb39a]`}>
-                  33.3%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Household Team Members */}
-          <div
-            className={`p-5 rounded-2xl border transition-colors shadow-sm ${
-              isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
-            }`}
-          >
-            <div className="flex items-center justify-between mb-3">
-              <h4 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-2 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                <Users className="w-4 h-4 text-[#c9b27c]" />
-                Household Members (3)
-              </h4>
-              <span className="text-[10px] text-[#8fb39a] flex items-center gap-1 font-semibold">
-                <CheckCircle2 className="w-3 h-3" /> All online
-              </span>
-            </div>
-
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-[#c9b27c]/20 text-[#c9b27c] text-xs font-bold flex items-center justify-center">
-                    AR
-                  </div>
-                  <div>
-                    <span className={`text-xs font-bold block ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                      Alex Rivera (You)
-                    </span>
-                    <span className="text-[10px] text-[#8a8a93]">Primary Admin</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-[#c9b27c]">
-                  Admin
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-[#8fb39a]/20 text-[#8fb39a] text-xs font-bold flex items-center justify-center">
-                    SC
-                  </div>
-                  <div>
-                    <span className={`text-xs font-bold block ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                      Sam Carter
-                    </span>
-                    <span className="text-[10px] text-[#8a8a93]">Active Member</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-[#8fb39a]">
-                  Member
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between py-1.5">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-full bg-[#d4a359]/20 text-[#d4a359] text-xs font-bold flex items-center justify-center">
-                    MP
-                  </div>
-                  <div>
-                    <span className={`text-xs font-bold block ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                      Maya Patel
-                    </span>
-                    <span className="text-[10px] text-[#8a8a93]">Active Member</span>
-                  </div>
-                </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-neutral-800 text-[#d4a359]">
-                  Member
+                  Active
                 </span>
               </div>
             </div>

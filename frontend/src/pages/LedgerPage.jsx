@@ -3,10 +3,10 @@ import { ChevronLeft, ChevronRight, Plus, Search, Filter } from 'lucide-react';
 import CategoryBadge from '../components/common/CategoryBadge';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
-import { formatCurrency, AVAILABLE_CATEGORIES } from '../data/financeData';
+import { formatCurrency } from '../data/financeData';
 
 export default function LedgerPage() {
-  const { transactions, totalSpent, setIsAddExpenseModalOpen } = useFinance();
+  const { transactions, totalSpent, setIsAddExpenseModalOpen, availableCategories } = useFinance();
   const { isDark } = useTheme();
 
   const [selectedMonth, setSelectedMonth] = useState('Nov 2026');
@@ -134,7 +134,7 @@ export default function LedgerPage() {
             >
               All ({transactions.length})
             </button>
-            {AVAILABLE_CATEGORIES.map((cat) => (
+            {availableCategories.map((cat) => (
               <button
                 key={cat.name}
                 type="button"

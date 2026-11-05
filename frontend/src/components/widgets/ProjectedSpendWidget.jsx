@@ -10,7 +10,9 @@ export default function ProjectedSpendWidget({ customTheme = null }) {
 
   // Assuming 22 days passed, projected = (totalSpent / 22) * 30
   const projectedVal = Math.round((totalSpent / 22) * 30) || 25080;
-  const underPercent = (((monthlyLimit - projectedVal) / monthlyLimit) * 100).toFixed(1);
+  const underPercent = monthlyLimit > 0
+    ? (((monthlyLimit - projectedVal) / monthlyLimit) * 100).toFixed(1)
+    : '0.0';
 
   return (
     <div
