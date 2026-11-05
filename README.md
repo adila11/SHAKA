@@ -42,62 +42,38 @@ The application is built as a **proper, full-page web application** that seamles
 
 ---
 
-## 📂 Project Structure
+## 📂 Repository Structure
 
 ```text
-src/
-├── components/
-│   ├── common/
-│   │   ├── CategoryBadge.jsx            # Category indicators with semantic dot accents
-│   │   ├── HomeIndicator.jsx            # iOS bottom indicator
-│   │   ├── ShakaLogo.jsx                # Luxury gold monogram brandmark
-│   │   └── StatusBar.jsx                # Mobile status bar
-│   ├── layout/
-│   │   ├── Navbar.jsx                   # Full desktop top header with navigation & actions
-│   │   ├── MobileNav.jsx                # Mobile bottom dock (visible on small viewports)
-│   │   ├── ResponsiveLayout.jsx         # Root responsive layout wrapper
-│   │   ├── AppHeader.jsx                # In-app compact header
-│   │   ├── PhoneFrame.jsx               # Mobile frame container (for Stitch showcase)
-│   │   └── ShakaHeader.jsx              # Showcase header
-│   ├── modals/
-│   │   └── AddExpenseModal.jsx          # Responsive modal (bottom sheet on phone, modal on desktop)
-│   ├── showcase/
-│   │   ├── AllScreensGallery.jsx        # Raw 8-screen Stitch phone artboard preview
-│   │   └── InteractivePhoneSimulator.jsx
-│   └── widgets/
-│       ├── DonutSpendWidget.jsx         # SVG category donut chart with center pill
-│       ├── MonthlyLimitWidget.jsx       # Monthly spend limit card with progress bar
-│       ├── ProjectedSpendWidget.jsx     # Month-end projection with trend badge
-│       └── StatCardsWidget.jsx          # Quick metrics (Avg/Day, Today's spend, Days left)
-├── context/
-│   ├── FinanceContext.jsx               # Global state for transactions, limits, and screens
-│   └── ThemeContext.jsx                 # Dark (Obsidian) / Light (Alabaster) theme engine
-├── data/
-│   └── financeData.js                   # Mock data and currency formatters (₹ Indian Rupee)
-├── pages/
-│   ├── DashboardPage.jsx                # Full-page responsive Dashboard
-│   ├── LedgerPage.jsx                   # Full-page responsive Shared Ledger
-│   ├── BudgetPage.jsx                   # Full-page responsive Budget Planner
-│   ├── ProfilePage.jsx                  # Full-page responsive Settings & Profile
-│   ├── LoginPage.jsx                    # Full-page responsive Login card
-│   ├── ForgotPasswordPage.jsx           # Full-page responsive Forgot Password
-│   └── ChangePasswordPage.jsx           # Full-page responsive Change Password
-├── App.jsx                              # Page router & layout mounting
-├── index.css                            # Tailwind CSS v4 design tokens and reset
-└── main.jsx                             # Application entrypoint
+SHAKA/
+├── backend/                             # Backend API service
+│   └── README.md
+├── frontend/                            # React + Vite + Tailwind CSS frontend
+│   ├── public/
+│   ├── src/
+│   │   ├── components/
+│   │   │   ├── common/
+│   │   │   ├── layout/
+│   │   │   ├── modals/
+│   │   │   ├── showcase/
+│   │   │   └── widgets/
+│   │   ├── context/
+│   │   ├── data/
+│   │   ├── pages/
+│   │   ├── App.jsx
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── package.json
+│   └── vite.config.js
+└── README.md
 ```
 
 ---
 
-## 🚀 Running the Project
+## 🚀 Running the Frontend
 
 ```bash
-# Start Vite development server
+cd frontend
+npm install
 npm run dev
-
-# Run ESLint validation (0 errors, 0 warnings)
-npm run lint
-
-# Build for production
-npm run build
 ```
