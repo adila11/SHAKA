@@ -41,7 +41,7 @@ export default function DashboardPage() {
               Welcome back, {currentUser.name.split(' ')[0]}
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Shared financial ledger is active • Synced across 3 members in real-time.
+              Financial ledger is active • Real-time overview of monthly limits and spending.
             </p>
           </div>
 
@@ -85,7 +85,7 @@ export default function DashboardPage() {
             {formatCurrency(totalSpent)}
           </div>
           <span className="text-[11px] font-medium text-[#c9b27c] mt-1 inline-block">
-            {((totalSpent / monthlyLimit) * 100).toFixed(1)}% of limit
+            {monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of limit
           </span>
         </div>
 

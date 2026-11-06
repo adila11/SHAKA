@@ -5,9 +5,7 @@ import {
   User,
   Plus,
   Moon,
-  Sun,
-  Smartphone,
-  Monitor
+  Sun
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -18,8 +16,6 @@ export default function Navbar() {
     setCurrentScreen,
     setIsAddExpenseModalOpen,
     currentUser,
-    viewMode,
-    setViewMode,
     isLoggedIn,
     setIsLoggedIn,
   } = useFinance();
@@ -103,34 +99,6 @@ export default function Navbar() {
               <span className="hidden sm:inline">Add Expense</span>
             </button>
           )}
-
-          {/* View Mode Toggle: Responsive Page vs Stitch Phone Mockup */}
-          <div className="bg-[#17171a] border border-[#26262b] p-1 rounded-xl flex items-center gap-1">
-            <button
-              type="button"
-              title="Full Responsive Web Page"
-              onClick={() => setViewMode('page')}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                viewMode === 'page'
-                  ? 'bg-[#202024] text-[#c9b27c] border border-[#c9b27c]/30'
-                  : 'text-[#8a8a93] hover:text-[#e8e8ea]'
-              }`}
-            >
-              <Monitor className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              title="Stitch Mobile Phone Showcase"
-              onClick={() => setViewMode('all')}
-              className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                viewMode === 'all'
-                  ? 'bg-[#202024] text-[#c9b27c] border border-[#c9b27c]/30'
-                  : 'text-[#8a8a93] hover:text-[#e8e8ea]'
-              }`}
-            >
-              <Smartphone className="w-4 h-4" />
-            </button>
-          </div>
 
           {/* Theme switcher */}
           <button

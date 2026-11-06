@@ -60,7 +60,7 @@ export default function Screen6Budget({ customTheme = null, onNavigate }) {
           <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-[#26262b]' : 'bg-[#e5e3dc]'}`}>
             <div
               className="h-full rounded-full bg-[#c9b27c] transition-all duration-500"
-              style={{ width: `${Math.min(100, (totalSpent / monthlyLimit) * 100)}%` }}
+              style={{ width: `${monthlyLimit > 0 ? Math.min(100, (totalSpent / monthlyLimit) * 100) : 0}%` }}
             />
           </div>
         </div>
@@ -68,7 +68,7 @@ export default function Screen6Budget({ customTheme = null, onNavigate }) {
         {/* Category Allocations List */}
         <div className="space-y-2.5">
           {budgetCategories.map((cat) => {
-            const percent = Math.round((cat.spent / cat.limit) * 100);
+            const percent = cat.limit > 0 ? Math.round((cat.spent / cat.limit) * 100) : 0;
             const remaining = Math.max(0, cat.limit - cat.spent);
 
             return (

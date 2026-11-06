@@ -145,7 +145,7 @@ export default function AddExpenseModal() {
             Category
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {AVAILABLE_CATEGORIES.map((cat) => {
+            {availableCategories.map((cat) => {
               const isSelected = selectedCategory === cat.name;
               return (
                 <button

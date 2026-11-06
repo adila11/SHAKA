@@ -59,21 +59,23 @@ export function FinanceProvider({ children }) {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) return;
 
+    const chosenCategory = category || 'Food';
+
+    // Find color dynamically from availableCategories or budgetCategories
+    const matchedCategory =
+      availableCategories.find(c => (c.name || '').toLowerCase() === chosenCategory.toLowerCase()) ||
+      budgetCategories.find(c => (c.name || '').toLowerCase() === chosenCategory.toLowerCase() || (c.category || '').toLowerCase() === chosenCategory.toLowerCase());
+
+    const catColor = matchedCategory?.color || '#c9b27c';
+
     const newTx = {
       id: `tx-${Date.now()}`,
       date,
       fullDate: `${date}, 2026`,
       time,
-      category: category || 'Food',
-      categoryColor:
-        category === 'Food'
-          ? '#c9b27c'
-          : category === 'Rent'
-          ? '#8fb39a'
-          : category === 'Bills'
-          ? '#d4a359'
-          : '#8a8a93',
-      description: description || 'New expense',
+      category: chosenCategory,
+      categoryColor: catColor,
+      description: description || `${chosenCategory} expense`,
       amount: numAmount,
       user,
       userRole: 'Admin',
@@ -85,7 +87,11 @@ export function FinanceProvider({ children }) {
     // Update corresponding budget category spent
     setBudgetCategories(prev =>
       prev.map(cat => {
-        if (cat.category.toLowerCase() === (category || 'food').toLowerCase()) {
+        const matches =
+          (cat.category && cat.category.toLowerCase() === chosenCategory.toLowerCase()) ||
+          (cat.name && cat.name.toLowerCase() === chosenCategory.toLowerCase());
+
+        if (matches) {
           const updatedSpent = cat.spent + numAmount;
           const status =
             updatedSpent > cat.limit
@@ -124,7 +130,7 @@ export function FinanceProvider({ children }) {
 
     // Check if any existing transactions match this category
     const existingSpent = transactions
-      .filter(t => t.category.toLowerCase() === trimmedName.toLowerCase())
+      .filter(t => (t.category || '').toLowerCase() === trimmedName.toLowerCase())
       .reduce((sum, t) => sum + Number(t.amount), 0);
 
     const status =
@@ -147,7 +153,7 @@ export function FinanceProvider({ children }) {
 
     // Also add to availableCategories if not already present
     setAvailableCategories(prev => {
-      if (prev.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+      if (prev.some(c => (c.name || '').toLowerCase() === trimmedName.toLowerCase())) {
         return prev;
       }
       return [...prev, { name: trimmedName, color: catColor }];
@@ -155,12 +161,15 @@ export function FinanceProvider({ children }) {
   };
 
   const updateCategory = (categoryId, { name, limit, color }) => {
+    const oldCat = budgetCategories.find(b => b.id === categoryId);
+    const oldName = oldCat?.name || '';
+    const updatedName = name !== undefined && name.trim() ? name.trim() : oldCat?.name || '';
+    const limitVal = limit !== undefined && !isNaN(limit) && Number(limit) > 0 ? Number(limit) : oldCat?.limit || 5000;
+    const catColor = color || oldCat?.color || '#c9b27c';
+
     setBudgetCategories(prev =>
       prev.map(cat => {
         if (cat.id === categoryId) {
-          const updatedName = name !== undefined && name.trim() ? name.trim() : cat.name;
-          const limitVal = limit !== undefined && !isNaN(limit) && Number(limit) > 0 ? Number(limit) : cat.limit;
-          const catColor = color || cat.color;
           const status =
             cat.spent > limitVal ? 'Limit reached' : cat.spent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
           const statusColor =
@@ -180,15 +189,12 @@ export function FinanceProvider({ children }) {
       })
     );
 
-    if (name !== undefined && name.trim()) {
+    if (oldName && updatedName && oldName.toLowerCase() !== updatedName.toLowerCase()) {
       setAvailableCategories(prev =>
-        prev.map(c => {
-          const oldCat = budgetCategories.find(b => b.id === categoryId);
-          if (oldCat && c.name.toLowerCase() === oldCat.name.toLowerCase()) {
-            return { ...c, name: name.trim(), color: color || c.color };
-          }
-          return c;
-        })
+        prev.map(c => (c.name.toLowerCase() === oldName.toLowerCase() ? { ...c, name: updatedName, color: catColor } : c))
+      );
+      setTransactions(prev =>
+        prev.map(t => ((t.category || '').toLowerCase() === oldName.toLowerCase() ? { ...t, category: updatedName } : t))
       );
     }
   };
@@ -197,7 +203,9 @@ export function FinanceProvider({ children }) {
     const catToDelete = budgetCategories.find(c => c.id === categoryId);
     setBudgetCategories(prev => prev.filter(cat => cat.id !== categoryId));
     if (catToDelete) {
-      setAvailableCategories(prev => prev.filter(c => c.name.toLowerCase() !== catToDelete.name.toLowerCase()));
+      setAvailableCategories(prev =>
+        prev.filter(c => (c.name || '').toLowerCase() !== (catToDelete.name || '').toLowerCase())
+      );
     }
   };
 

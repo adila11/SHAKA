@@ -17,3 +17,4 @@ const budgetCategorySchema = new mongoose.Schema(
 );
 
 export const BudgetCategory = mongoose.model('BudgetCategory', budgetCategorySchema);
+
