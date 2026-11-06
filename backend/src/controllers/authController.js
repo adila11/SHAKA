@@ -1,9 +1,7 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import mongoose from 'mongoose';
 import { config } from '../config/index.js';
 import { User } from '../models/User.js';
-import { store } from '../data/store.js';
 
 export const login = async (req, res, next) => {
   try {
@@ -16,30 +14,16 @@ export const login = async (req, res, next) => {
       });
     }
 
-    let user = null;
-    const isMongoConnected = mongoose.connection.readyState === 1;
+    let user = await User.findOne({
+      $or: [
+        { username: new RegExp(`^${username}$`, 'i') },
+        { email: new RegExp(`^${username}$`, 'i') },
+      ],
+    });
 
-    if (isMongoConnected) {
-      user = await User.findOne({
-        $or: [
-          { username: new RegExp(`^${username}$`, 'i') },
-          { email: new RegExp(`^${username}$`, 'i') },
-        ],
-      });
-    } else {
-      const users = store.get('users') || [];
-      user = users.find(
-        u => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === username.toLowerCase()
-      );
-    }
-
-    // Default demo fallback if testing
+    // Default demo fallback if requested
     if (!user && (username.toLowerCase() === 'alex_rivera' || username.toLowerCase() === 'alex')) {
-      if (isMongoConnected) {
-        user = await User.findOne();
-      } else {
-        user = (store.get('users') || [])[0];
-      }
+      user = await User.findOne();
     }
 
     if (!user) {
@@ -49,7 +33,7 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Check password if hash exists, or permit standard demo password 'password123'
+    // Check password hash, or permit standard demo password 'password123'
     let isMatch = true;
     if (user.passwordHash && password !== 'password123') {
       isMatch = await bcrypt.compare(password, user.passwordHash).catch(() => false);
@@ -68,7 +52,7 @@ export const login = async (req, res, next) => {
       { expiresIn: '7d' }
     );
 
-    const safeUser = user.toObject ? user.toObject() : { ...user };
+    const safeUser = user.toObject();
     delete safeUser.passwordHash;
     delete safeUser._id;
     delete safeUser.__v;
@@ -86,16 +70,8 @@ export const login = async (req, res, next) => {
 
 export const getMe = async (req, res, next) => {
   try {
-    const isMongoConnected = mongoose.connection.readyState === 1;
-    let user = null;
-
-    if (isMongoConnected) {
-      user = await User.findOne();
-    } else {
-      user = (store.get('users') || [])[0];
-    }
-
-    const safeUser = user ? (user.toObject ? user.toObject() : { ...user }) : {};
+    const user = await User.findOne();
+    const safeUser = user ? user.toObject() : {};
     delete safeUser.passwordHash;
     delete safeUser._id;
     delete safeUser.__v;
@@ -134,13 +110,7 @@ export const changePassword = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(newPassword, salt);
 
-    if (mongoose.connection.readyState === 1) {
-      await User.findOneAndUpdate({}, { passwordHash: hashed });
-    } else {
-      store.update('users', users =>
-        users.map((u, i) => (i === 0 ? { ...u, passwordHash: hashed } : u))
-      );
-    }
+    await User.findOneAndUpdate({}, { passwordHash: hashed });
 
     res.status(200).json({
       success: true,

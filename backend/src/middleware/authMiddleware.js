@@ -1,8 +1,8 @@
 import jwt from 'jsonwebtoken';
 import { config } from '../config/index.js';
-import { store } from '../data/store.js';
+import { User } from '../models/User.js';
 
-export const protect = (req, res, next) => {
+export const protect = async (req, res, next) => {
   let token;
   const authHeader = req.headers.authorization;
 
@@ -19,8 +19,9 @@ export const protect = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret);
-    const users = store.get('users') || [];
-    const user = users.find(u => u.id === decoded.id || u.username === decoded.username);
+    const user = await User.findOne({
+      $or: [{ id: decoded.id }, { username: decoded.username }],
+    }).lean();
 
     if (!user) {
       return res.status(401).json({
@@ -29,14 +30,13 @@ export const protect = (req, res, next) => {
       });
     }
 
-    const { passwordHash, ...safeUser } = user;
+    const { passwordHash, _id, __v, ...safeUser } = user;
     req.user = safeUser;
     next();
-  } catch (err) {
+  } catch {
     return res.status(401).json({
       success: false,
       message: 'Not authorized, token invalid or expired',
     });
   }
 };
-
