@@ -2,9 +2,10 @@ import { TrendingUp, CheckCircle2 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../data/financeData';
+import { Skeleton } from '../common/Skeleton';
 
 export default function ProjectedSpendWidget({ customTheme = null }) {
-  const { totalSpent, monthlyLimit } = useFinance();
+  const { totalSpent, monthlyLimit, isLoading } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -29,10 +30,16 @@ export default function ProjectedSpendWidget({ customTheme = null }) {
             Projected Month-End
           </span>
           <div className={`text-sm font-black font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {formatCurrency(projectedVal)}{' '}
-            <span className={`text-[10px] font-normal ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              of {formatCurrency(monthlyLimit)}
-            </span>
+            {isLoading ? (
+              <Skeleton className="w-24 h-4 my-0.5" />
+            ) : (
+              <>
+                {formatCurrency(projectedVal)}{' '}
+                <span className={`text-[10px] font-normal ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                  of {formatCurrency(monthlyLimit)}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

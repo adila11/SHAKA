@@ -1,15 +1,12 @@
-import { BudgetCategory } from '../models/BudgetCategory.js';
-import { Transaction } from '../models/Transaction.js';
-import { Setting } from '../models/Setting.js';
+import { dbStore } from '../data/dbStore.js';
 
 export const getBudgetCategories = async (req, res, next) => {
   try {
-    const categories = await BudgetCategory.find().lean();
-    const sanitized = categories.map(({ _id, __v, ...item }) => item);
+    const list = await dbStore.budget.getCategories();
     res.status(200).json({
       success: true,
-      count: sanitized.length,
-      data: sanitized,
+      count: list.length,
+      data: list,
     });
   } catch (error) {
     next(error);
@@ -32,8 +29,8 @@ export const addBudgetCategory = async (req, res, next) => {
     const catColor = color || '#c9b27c';
     const newId = `cat-${Date.now()}`;
 
-    const txs = await Transaction.find({ category: new RegExp(`^${trimmedName}$`, 'i') });
-    const existingSpent = txs.reduce((sum, t) => sum + Number(t.amount), 0);
+    const txs = await dbStore.transactions.find({ category: trimmedName });
+    const existingSpent = txs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
 
     const status =
       existingSpent > limitVal ? 'Limit reached' : existingSpent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
@@ -51,11 +48,8 @@ export const addBudgetCategory = async (req, res, next) => {
       statusColor,
     };
 
-    await BudgetCategory.create(newCategory);
-    await Setting.findOneAndUpdate(
-      { key: 'global' },
-      { $addToSet: { availableCategories: { name: trimmedName, color: catColor } } }
-    );
+    await dbStore.budget.addCategory(newCategory);
+    await dbStore.budget.addAvailableCategory({ name: trimmedName, color: catColor });
 
     res.status(201).json({
       success: true,
@@ -72,7 +66,9 @@ export const updateBudgetCategory = async (req, res, next) => {
     const { id } = req.params;
     const { name, limit, color } = req.body;
 
-    const existing = await BudgetCategory.findOne({ id });
+    const list = await dbStore.budget.getCategories();
+    const existing = list.find(c => c.id === id);
+
     if (!existing) {
       return res.status(404).json({ success: false, message: 'Category not found' });
     }
@@ -87,22 +83,21 @@ export const updateBudgetCategory = async (req, res, next) => {
     const statusColor =
       status === 'Limit reached' ? '#d97070' : status === 'Near limit' ? '#d4a359' : '#8fb39a';
 
-    existing.name = updatedName;
-    existing.category = updatedName;
-    existing.limit = limitVal;
-    existing.color = catColor;
-    existing.status = status;
-    existing.statusColor = statusColor;
-    await existing.save();
+    const updates = {
+      name: updatedName,
+      category: updatedName,
+      limit: limitVal,
+      color: catColor,
+      status,
+      statusColor,
+    };
 
-    const sanitized = existing.toObject();
-    delete sanitized._id;
-    delete sanitized.__v;
+    const updated = await dbStore.budget.updateCategory(id, updates);
 
     res.status(200).json({
       success: true,
       message: 'Category updated successfully',
-      data: sanitized,
+      data: updated,
     });
   } catch (error) {
     next(error);
@@ -112,9 +107,9 @@ export const updateBudgetCategory = async (req, res, next) => {
 export const deleteBudgetCategory = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deleted = await BudgetCategory.findOneAndDelete({ id });
+    const success = await dbStore.budget.deleteCategory(id);
 
-    if (!deleted) {
+    if (!success) {
       return res.status(404).json({ success: false, message: 'Category not found' });
     }
 
@@ -129,8 +124,7 @@ export const deleteBudgetCategory = async (req, res, next) => {
 
 export const getMonthlyLimit = async (req, res, next) => {
   try {
-    const setting = await Setting.findOne({ key: 'global' });
-    const limit = setting?.monthlyLimit || 30000;
+    const limit = await dbStore.budget.getMonthlyLimit();
     res.status(200).json({ success: true, monthlyLimit: limit });
   } catch (error) {
     next(error);
@@ -149,11 +143,7 @@ export const updateMonthlyLimit = async (req, res, next) => {
       });
     }
 
-    await Setting.findOneAndUpdate(
-      { key: 'global' },
-      { monthlyLimit: num },
-      { upsert: true }
-    );
+    await dbStore.budget.updateMonthlyLimit(num);
 
     res.status(200).json({
       success: true,
@@ -167,8 +157,7 @@ export const updateMonthlyLimit = async (req, res, next) => {
 
 export const getAvailableCategories = async (req, res, next) => {
   try {
-    const setting = await Setting.findOne({ key: 'global' }).lean();
-    const categories = setting?.availableCategories || [];
+    const categories = await dbStore.budget.getAvailableCategories();
     res.status(200).json({ success: true, data: categories });
   } catch (error) {
     next(error);

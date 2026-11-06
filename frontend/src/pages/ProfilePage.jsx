@@ -1,27 +1,176 @@
+import { useState, useEffect } from 'react';
 import {
-  ShieldCheck,
   KeyRound,
   SunMedium,
   Moon,
   LogOut,
   ChevronRight,
   Coins,
-  UserCheck
+  ShieldCheck,
+  ShieldAlert,
+  Lock,
+  RefreshCw,
+  Eye,
+  EyeOff,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ProfilePage() {
-  const { currentUser, logout, setCurrentScreen, transactions } = useFinance();
+  const {
+    currentUser,
+    logout,
+    setCurrentScreen,
+    sessionInfo,
+    fetchSessionInfo,
+    isAccessCodeEnabled,
+    enableAccessCode,
+    changeAccessCode,
+    disableAccessCode,
+    resetAccessCode,
+  } = useFinance();
   const { isDark, setTheme } = useTheme();
 
-  const handleLogout = () => {
-    logout();
+  // Modal dialog states: null | 'enable' | 'change' | 'disable' | 'view_reset'
+  const [modalType, setModalType] = useState(null);
+
+  // Form states
+  const [accessCode, setAccessCode] = useState('');
+  const [confirmCode, setConfirmCode] = useState('');
+  const [currentCode, setCurrentCode] = useState('');
+  const [accountPassword, setAccountPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
+
+  useEffect(() => {
+    fetchSessionInfo();
+  }, [fetchSessionInfo]);
+
+  const closeModal = () => {
+    setModalType(null);
+    setAccessCode('');
+    setConfirmCode('');
+    setCurrentCode('');
+    setAccountPassword('');
+    setShowPassword(false);
+    setFeedback(null);
   };
 
-  const userTransactionsCount = transactions.filter(
-    (t) => t.user === (currentUser?.name?.split(' ')[0] || 'Alex')
-  ).length;
+  const handleEnable = async (e) => {
+    e.preventDefault();
+    if (!/^\d{4}$/.test(accessCode)) {
+      setFeedback({ type: 'error', message: 'Access code must be a 4-digit number.' });
+      return;
+    }
+    if (accessCode !== confirmCode) {
+      setFeedback({ type: 'error', message: 'Access codes do not match.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback(null);
+    const res = await enableAccessCode(accessCode);
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setFeedback({ type: 'success', message: '4-digit access code enabled successfully!' });
+      setTimeout(closeModal, 1200);
+    } else {
+      setFeedback({ type: 'error', message: res.message || 'Failed to enable access code.' });
+    }
+  };
+
+  const handleChange = async (e) => {
+    e.preventDefault();
+    if (!/^\d{4}$/.test(currentCode)) {
+      setFeedback({ type: 'error', message: 'Current access code must be a 4-digit number.' });
+      return;
+    }
+    if (!/^\d{4}$/.test(accessCode)) {
+      setFeedback({ type: 'error', message: 'New access code must be a 4-digit number.' });
+      return;
+    }
+    if (accessCode !== confirmCode) {
+      setFeedback({ type: 'error', message: 'New access codes do not match.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback(null);
+    const res = await changeAccessCode(currentCode, accessCode);
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setFeedback({ type: 'success', message: '4-digit access code changed successfully!' });
+      setTimeout(closeModal, 1200);
+    } else {
+      setFeedback({ type: 'error', message: res.message || 'Failed to update access code.' });
+    }
+  };
+
+  const handleDisable = async (e) => {
+    e.preventDefault();
+    if (!currentCode.trim() && !accountPassword.trim()) {
+      setFeedback({ type: 'error', message: 'Enter your 4-digit access code or account password to confirm.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback(null);
+    const res = await disableAccessCode(currentCode, accountPassword);
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setFeedback({ type: 'success', message: 'Access code disabled.' });
+      setTimeout(closeModal, 1200);
+    } else {
+      setFeedback({ type: 'error', message: res.message || 'Verification failed.' });
+    }
+  };
+
+  const handleReset = async (e) => {
+    e.preventDefault();
+    if (!accountPassword.trim()) {
+      setFeedback({ type: 'error', message: 'Account password is required to reset access code.' });
+      return;
+    }
+    if (!/^\d{4}$/.test(accessCode)) {
+      setFeedback({ type: 'error', message: 'New access code must be a 4-digit number.' });
+      return;
+    }
+    if (accessCode !== confirmCode) {
+      setFeedback({ type: 'error', message: 'New access codes do not match.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    setFeedback(null);
+    const res = await resetAccessCode(accountPassword, accessCode);
+    setIsSubmitting(false);
+
+    if (res.success) {
+      setFeedback({ type: 'success', message: 'Access code reset successfully!' });
+      setTimeout(closeModal, 1200);
+    } else {
+      setFeedback({ type: 'error', message: res.message || 'Password verification failed.' });
+    }
+  };
+
+  // Format timestamps
+  const formatTime = (ts) => {
+    if (!ts) return 'Active now';
+    return new Date(ts).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   return (
     <div className="space-y-6 w-full">
@@ -37,13 +186,13 @@ export default function ProfilePage() {
               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#c9b27c]/15 text-[#c9b27c] border border-[#c9b27c]/30">
                 Verified Account
               </span>
-              <span className="text-xs text-[#8a8a93]">SHAKA Instance #3811</span>
+              <span className="text-xs text-[#8a8a93]">SHAKA Security</span>
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              Settings & Account
+              Settings & Security
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Manage your personal credentials, security settings, and app preferences.
+              Manage your personal credentials, security settings, and user-specific access code.
             </p>
           </div>
         </div>
@@ -60,19 +209,14 @@ export default function ProfilePage() {
             }`}
           >
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#c9b27c]/15">
-              {currentUser?.initials || 'AR'}
+              {(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}
             </div>
-            <h3 className={`text-lg font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              {currentUser?.name || 'Alex Rivera'}
+            <h3 className={`text-lg font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+              {currentUser?.username || 'abdulshamil'}
             </h3>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              {currentUser?.username || 'alex_rivera'} • {currentUser?.email || 'alex.rivera@shaka.ledgerly.io'}
+              Account ID • MongoDB Authenticated
             </p>
-
-            <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#c9b27c]/15 text-[#c9b27c] text-xs font-semibold border border-[#c9b27c]/30">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{currentUser?.role || 'Member'}</span>
-            </div>
 
             {/* Metrics */}
             <div className="grid grid-cols-2 gap-3 mt-6 pt-5 border-t border-[#26262b]/60">
@@ -82,10 +226,10 @@ export default function ProfilePage() {
                 }`}
               >
                 <span className="text-[10px] text-[#8a8a93] uppercase tracking-wider block">
-                  Logged Entries
+                  Created At
                 </span>
-                <span className={`text-lg font-bold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                  {userTransactionsCount || 14}
+                <span className={`text-xs font-semibold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                  {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : 'Live'}
                 </span>
               </div>
               <div
@@ -94,9 +238,9 @@ export default function ProfilePage() {
                 }`}
               >
                 <span className="text-[10px] text-[#8a8a93] uppercase tracking-wider block">
-                  Status
+                  Session
                 </span>
-                <span className={`text-lg font-bold font-mono text-[#8fb39a]`}>
+                <span className={`text-xs font-bold font-mono text-[#8fb39a]`}>
                   Active
                 </span>
               </div>
@@ -106,14 +250,125 @@ export default function ProfilePage() {
 
         {/* Right Column (8 cols on desktop): Settings Panels */}
         <div className="lg:col-span-8 space-y-6">
-          {/* Section 1: Security & Credentials */}
+          {/* Section 1: Access Code Security (Replaces old 2FA) */}
+          <div
+            className={`p-6 rounded-2xl border transition-colors shadow-sm ${
+              isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
+            }`}
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#c9b27c]/15 text-[#c9b27c] flex items-center justify-center shrink-0">
+                  <Lock className="w-5 h-5 stroke-[2.2]" />
+                </div>
+                <div>
+                  <h4 className={`text-base font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    Access Code Security
+                  </h4>
+                  <p className={`text-xs ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    User-specific fast reauthentication security
+                  </p>
+                </div>
+              </div>
+
+              {/* Status Pill */}
+              <div>
+                {isAccessCodeEnabled ? (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Access Code Enabled</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-neutral-800/40 text-[#8a8a93] border border-neutral-700/40">
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>Access Code Disabled</span>
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Session Information Box */}
+            <div
+              className={`p-4 rounded-xl border mb-5 ${
+                isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+              }`}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div>
+                  <span className={`block text-[10px] uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Session Status
+                  </span>
+                  <span className="font-bold text-[#8fb39a] flex items-center gap-1.5 mt-0.5">
+                    <span className="w-2 h-2 rounded-full bg-[#8fb39a]" />
+                    <span>Active Session</span>
+                  </span>
+                </div>
+                <div>
+                  <span className={`block text-[10px] uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Last Authenticated Activity
+                  </span>
+                  <span className={`font-mono block mt-0.5 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    {formatTime(sessionInfo?.lastActivityAt)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons for Access Code */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              {!isAccessCodeEnabled ? (
+                <button
+                  type="button"
+                  onClick={() => setModalType('enable')}
+                  className="px-4 py-2.5 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
+                >
+                  <Lock className="w-4 h-4 stroke-[2.5]" />
+                  <span>Enable Access Code</span>
+                </button>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setModalType('change')}
+                    className="px-4 py-2 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    <span>Change Access Code</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalType('view_reset')}
+                    className={`px-4 py-2 rounded-xl border text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5 ${
+                      isDark
+                        ? 'bg-[#202024] border-[#26262b] text-[#e8e8ea] hover:bg-[#28282d]'
+                        : 'bg-white border-[#e5e3dc] text-[#18181b] hover:bg-[#f6f5f2]'
+                    }`}
+                  >
+                    <Eye className="w-3.5 h-3.5 text-[#c9b27c]" />
+                    <span>View / Reset Code</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setModalType('disable')}
+                    className="px-3.5 py-2 rounded-xl border border-[#d97070]/30 hover:bg-[#d97070]/10 text-[#d97070] text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    <span>Disable</span>
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Section 2: Account Password */}
           <div
             className={`p-5 rounded-2xl border transition-colors shadow-sm ${
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
             }`}
           >
             <h4 className={`text-xs font-bold uppercase tracking-wider mb-4 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Security & Credentials
+              Credentials
             </h4>
 
             <div className="space-y-3">
@@ -135,39 +390,16 @@ export default function ProfilePage() {
                       Change Password
                     </span>
                     <span className={`text-xs ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                      Update your login passphrase and multi-user authentication token
+                      Update your account login password
                     </span>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-[#8a8a93]" />
               </button>
-
-              <div
-                className={`p-4 rounded-xl border flex items-center justify-between ${
-                  isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-lg bg-[#8fb39a]/15 text-[#8fb39a] flex items-center justify-center">
-                    <UserCheck className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <span className={`text-sm font-bold block ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                      Two-Factor Authentication
-                    </span>
-                    <span className={`text-xs ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                      Enforced for all admin transactions above ₹5,000
-                    </span>
-                  </div>
-                </div>
-                <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30">
-                  Enabled
-                </span>
-              </div>
             </div>
           </div>
 
-          {/* Section 2: Preferences & Theme */}
+          {/* Section 3: Preferences & Theme */}
           <div
             className={`p-5 rounded-2xl border transition-colors shadow-sm ${
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
@@ -244,7 +476,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Section 3: Danger Zone */}
+          {/* Section 4: Session Control */}
           <div
             className={`p-5 rounded-2xl border border-[#d97070]/30 bg-[#d97070]/5 transition-colors shadow-sm`}
           >
@@ -254,13 +486,13 @@ export default function ProfilePage() {
                   Session Control
                 </h4>
                 <p className={`text-xs mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                  Terminate your active login session on this browser.
+                  Terminate your active login session and revoke authentication tokens.
                 </p>
               </div>
 
               <button
                 type="button"
-                onClick={handleLogout}
+                onClick={logout}
                 className="px-4 py-2.5 rounded-xl bg-[#d97070]/15 hover:bg-[#d97070]/25 text-[#d97070] font-bold text-xs border border-[#d97070]/30 transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
               >
                 <LogOut className="w-4 h-4" />
@@ -270,6 +502,431 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* --- MODAL DIALOGS --- */}
+
+      {/* 1. Enable Access Code Modal */}
+      {modalType === 'enable' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+              isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold">Enable Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className={`text-xs mb-4 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+              Create a 4-digit numeric access code (PIN). This code will belong exclusively to your admin account (<span className="font-mono font-bold text-[#c9b27c]">{currentUser?.username}</span>) and is stored securely using bcrypt hashing.
+            </p>
+
+            {feedback && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  feedback.type === 'success'
+                    ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                    : 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                }`}
+              >
+                {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span>{feedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleEnable} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1">New 4-Digit Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  placeholder="4-digit PIN (e.g. 1234)"
+                  className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Confirm 4-Digit Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmCode}
+                  onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  placeholder="Re-enter 4-digit PIN"
+                  className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-xs text-[#c9b27c] flex items-center gap-1 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showPassword ? 'Hide characters' : 'Show characters'}</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Save Access Code</span>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Change Access Code Modal */}
+      {modalType === 'change' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+              isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold">Change Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {feedback && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  feedback.type === 'success'
+                    ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                    : 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                }`}
+              >
+                {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span>{feedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleChange} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Current 4-Digit Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={currentCode}
+                  onChange={(e) => setCurrentCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  placeholder="Enter current PIN"
+                  className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">New 4-Digit Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  placeholder="New 4-digit PIN"
+                  className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Confirm New 4-Digit Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={confirmCode}
+                  onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  required
+                  placeholder="Re-enter new 4-digit PIN"
+                  className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-xs text-[#c9b27c] flex items-center gap-1 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showPassword ? 'Hide characters' : 'Show characters'}</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Update Code</span>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 3. View / Reset Access Code Modal */}
+      {modalType === 'view_reset' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+              isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold">Access Code Security & Reset</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cryptographic Security Notice */}
+            <div
+              className={`p-4 rounded-xl border mb-4 space-y-2 text-xs ${
+                isDark ? 'bg-[#0e0e10] border-[#c9b27c]/40 text-[#8a8a93]' : 'bg-[#faf9f6] border-[#c9b27c]/40 text-[#71717a]'
+              }`}
+            >
+              <div className="flex items-center gap-2 text-[#c9b27c] font-bold">
+                <Lock className="w-4 h-4" />
+                <span>One-Way Cryptographic Security</span>
+              </div>
+              <p>
+                To strictly adhere to bank-grade security principles, access codes are stored with irreversible <span className="font-mono text-[#c9b27c]">bcrypt</span> password-hashing. Plaintext codes are never stored or recoverable.
+              </p>
+              <p className="text-[11px] font-medium text-[#c9b27c]">
+                If you have forgotten or need to change your access code, authenticate with your account password below to reset it immediately.
+              </p>
+            </div>
+
+            {feedback && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  feedback.type === 'success'
+                    ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                    : 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                }`}
+              >
+                {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span>{feedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleReset} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Account Password (for verification)</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={accountPassword}
+                  onChange={(e) => setAccountPassword(e.target.value)}
+                  required
+                  placeholder="Enter login password"
+                  className={`w-full h-11 px-3 rounded-xl border text-sm outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">New Access Code (4 digits)</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  required
+                  placeholder="4-digit PIN"
+                  className={`w-full h-11 px-3 rounded-xl border text-sm font-mono tracking-widest outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Confirm New Access Code</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={confirmCode}
+                  onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  required
+                  placeholder="Re-enter 4-digit PIN"
+                  className={`w-full h-11 px-3 rounded-xl border text-sm font-mono tracking-widest outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-xs text-[#c9b27c] flex items-center gap-1 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  <span>{showPassword ? 'Hide password' : 'Show password'}</span>
+                </button>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Reset & Save</span>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Disable Access Code Modal */}
+      {modalType === 'disable' && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+              isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-[#d97070]">Disable Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className={`text-xs mb-4 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+              Disable access code authentication. Please authenticate with your current access code or account password to confirm.
+            </p>
+
+            {feedback && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  feedback.type === 'success'
+                    ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                    : 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                }`}
+              >
+                {feedback.type === 'success' ? <CheckCircle2 className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
+                <span>{feedback.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleDisable} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Current Access Code (4 digits)</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={currentCode}
+                  onChange={(e) => setCurrentCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  maxLength={4}
+                  placeholder="Enter 4-digit PIN"
+                  className={`w-full h-11 px-3 rounded-xl border text-sm font-mono tracking-widest outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div className="text-center text-xs text-[#8a8a93]">- OR -</div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Account Password</label>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={accountPassword}
+                  onChange={(e) => setAccountPassword(e.target.value)}
+                  placeholder="Enter account password"
+                  className={`w-full h-11 px-3 rounded-xl border text-sm outline-none focus:border-[#c9b27c] ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
+                  }`}
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 py-2.5 rounded-xl bg-[#d97070] text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <span>Confirm Disable</span>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

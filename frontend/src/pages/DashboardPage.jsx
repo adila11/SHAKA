@@ -5,12 +5,22 @@ import StatCardsWidget from '../components/widgets/StatCardsWidget';
 import ProjectedSpendWidget from '../components/widgets/ProjectedSpendWidget';
 import CategoryBadge from '../components/common/CategoryBadge';
 import BackendSyncBadge from '../components/common/BackendSyncBadge';
+import { Skeleton } from '../components/common/Skeleton';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function DashboardPage() {
-  const { currentUser, transactions, totalSpent, monthlyLimit, setCurrentScreen, setIsAddExpenseModalOpen } = useFinance();
+  const {
+    currentUser,
+    transactions,
+    totalSpent,
+    monthlyLimit,
+    householdMembers,
+    setCurrentScreen,
+    setIsAddExpenseModalOpen,
+    isLoading,
+  } = useFinance();
   const { isDark } = useTheme();
 
   const recentTransactions = transactions.slice(0, 5);
@@ -36,7 +46,7 @@ export default function DashboardPage() {
               <BackendSyncBadge />
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              Welcome back, {currentUser?.name ? currentUser.name.split(' ')[0] : 'Member'}
+              Welcome back, {currentUser?.username || 'abdulshamil'}
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Financial ledger is active • Real-time overview of monthly limits and spending.
@@ -80,10 +90,14 @@ export default function DashboardPage() {
             Total Spent
           </span>
           <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {formatCurrency(totalSpent)}
+            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(totalSpent)}
           </div>
           <span className="text-[11px] font-medium text-[#c9b27c] mt-1 inline-block">
-            {monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of limit
+            {isLoading ? (
+              <Skeleton className="h-3 w-20" />
+            ) : (
+              `${monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of limit`
+            )}
           </span>
         </div>
 
@@ -97,10 +111,10 @@ export default function DashboardPage() {
             Remaining Budget
           </span>
           <div className="text-2xl font-black font-mono tracking-tight mt-1 text-[#8fb39a]">
-            {formatCurrency(Math.max(0, monthlyLimit - totalSpent))}
+            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(Math.max(0, monthlyLimit - totalSpent))}
           </div>
           <span className={`text-[11px] font-medium mt-1 inline-block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            Limit: {formatCurrency(monthlyLimit)}
+            {isLoading ? <Skeleton className="h-3 w-24" /> : `Limit: ${formatCurrency(monthlyLimit)}`}
           </span>
         </div>
 
@@ -114,7 +128,7 @@ export default function DashboardPage() {
             Daily Average
           </span>
           <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {formatCurrency(Math.round(totalSpent / 22))}
+            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(Math.round(totalSpent / 22))}
           </div>
           <span className="text-[11px] font-semibold text-[#8fb39a] mt-1 inline-block">
             Normalized pace
@@ -131,7 +145,7 @@ export default function DashboardPage() {
             Shared Members
           </span>
           <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            3 Active
+            {isLoading ? <Skeleton className="h-7 w-24 my-1" /> : `${householdMembers?.length || 2} Active`}
           </div>
           <span className="text-[11px] font-semibold text-[#c9b27c] mt-1 inline-flex items-center gap-1">
             <ShieldCheck className="w-3.5 h-3.5" />
@@ -181,7 +195,20 @@ export default function DashboardPage() {
             </div>
 
             <div className="divide-y divide-[#26262b]/50">
-              {recentTransactions.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Skeleton className="w-9 h-9 rounded-xl shrink-0" />
+                      <div className="space-y-1.5">
+                        <Skeleton className="w-32 h-3.5 rounded" />
+                        <Skeleton className="w-20 h-2.5 rounded" />
+                      </div>
+                    </div>
+                    <Skeleton className="w-16 h-4 rounded shrink-0" />
+                  </div>
+                ))
+              ) : recentTransactions.length === 0 ? (
                 <div className="py-8 text-center text-xs text-[#8a8a93]">
                   No expenses recorded yet. Click below to add your first expense!
                 </div>

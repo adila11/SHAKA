@@ -1,9 +1,10 @@
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../data/financeData';
+import { Skeleton } from '../common/Skeleton';
 
 export default function DonutSpendWidget({ customTheme = null }) {
-  const { totalSpent, budgetCategories, categoryTotals } = useFinance();
+  const { totalSpent, budgetCategories, categoryTotals, isLoading } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -100,7 +101,7 @@ export default function DonutSpendWidget({ customTheme = null }) {
             Nov Total
           </span>
           <span className={`text-xs font-black font-mono tracking-tight mt-0.5 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {formatShort(totalSpent)}
+            {isLoading ? <Skeleton className="w-10 h-3 my-0.5" /> : formatShort(totalSpent)}
           </span>
         </div>
       </div>

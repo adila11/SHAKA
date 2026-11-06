@@ -1,15 +1,32 @@
+import { lazy, Suspense } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import ResponsiveLayout from './components/layout/ResponsiveLayout';
-import DashboardPage from './pages/DashboardPage';
-import LedgerPage from './pages/LedgerPage';
-import BudgetPage from './pages/BudgetPage';
-import ProfilePage from './pages/ProfilePage';
-import LoginPage from './pages/LoginPage';
-import ForgotPasswordPage from './pages/ForgotPasswordPage';
-import ChangePasswordPage from './pages/ChangePasswordPage';
-import AllScreensGallery from './components/showcase/AllScreensGallery';
+import AccessCodePromptModal from './components/modals/AccessCodePromptModal';
 import { ArrowLeft } from 'lucide-react';
+
+// Code-splitting & Lazy Loading for all pages
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const LedgerPage = lazy(() => import('./pages/LedgerPage'));
+const BudgetPage = lazy(() => import('./pages/BudgetPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
+const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
+const AllScreensGallery = lazy(() => import('./components/showcase/AllScreensGallery'));
+
+function PageLoadingFallback() {
+  return (
+    <div className="w-full py-20 flex flex-col items-center justify-center gap-3">
+      <div className="w-48 h-1.5 rounded-full overflow-hidden bg-[#26262b]">
+        <div className="h-full rounded-full bg-gradient-to-r from-[#c9b27c] via-[#ecd9aa] to-[#c9b27c] animate-pulse w-full" />
+      </div>
+      <span className="text-xs font-semibold uppercase tracking-wider text-[#8a8a93]">
+        Loading view...
+      </span>
+    </div>
+  );
+}
 
 function PageRouter() {
   const { currentScreen, viewMode, setViewMode } = useFinance();
@@ -31,12 +48,14 @@ function PageRouter() {
             Viewing raw 8-Screen Stitch Phone Gallery
           </span>
         </div>
-        <AllScreensGallery />
+        <Suspense fallback={<PageLoadingFallback />}>
+          <AllScreensGallery />
+        </Suspense>
       </div>
     );
   }
 
-  // Proper responsive page layout (default)
+  // Proper responsive page layout (default) with lazy-loaded routes
   const renderCurrentPage = () => {
     switch (currentScreen) {
       case 'dashboard':
@@ -58,7 +77,14 @@ function PageRouter() {
     }
   };
 
-  return <ResponsiveLayout>{renderCurrentPage()}</ResponsiveLayout>;
+  return (
+    <ResponsiveLayout>
+      <Suspense fallback={<PageLoadingFallback />}>
+        {renderCurrentPage()}
+      </Suspense>
+      <AccessCodePromptModal />
+    </ResponsiveLayout>
+  );
 }
 
 export default function App() {

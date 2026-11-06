@@ -12,7 +12,7 @@ import {
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
-import BackendSyncBadge from '../components/common/BackendSyncBadge';
+import { Skeleton } from '../components/common/Skeleton';
 
 const COLOR_PALETTE = [
   { name: 'Gold', hex: '#c9b27c' },
@@ -32,6 +32,7 @@ export default function BudgetPage() {
     addCategory,
     updateCategory,
     deleteCategory,
+    isLoading,
   } = useFinance();
   const { isDark } = useTheme();
 
@@ -113,9 +114,6 @@ export default function BudgetPage() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="mb-1">
-              <BackendSyncBadge />
-            </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Budget Allocation
             </h2>
@@ -148,10 +146,10 @@ export default function BudgetPage() {
             </span>
             <div className="flex items-baseline gap-3 mt-1">
               <span className={`text-3xl font-black font-mono tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                {formatCurrency(totalSpent)}
+                {isLoading ? <Skeleton className="w-28 h-8 my-0.5 inline-block" /> : formatCurrency(totalSpent)}
               </span>
               <span className={`text-sm font-medium ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                spent of {formatCurrency(monthlyLimit)}
+                spent of {isLoading ? <Skeleton className="w-16 h-4 inline-block" /> : formatCurrency(monthlyLimit)}
               </span>
             </div>
           </div>
@@ -161,21 +159,25 @@ export default function BudgetPage() {
               Surplus Remaining
             </span>
             <div className="text-2xl font-black font-mono text-[#8fb39a] mt-1">
-              {formatCurrency(remainingLimit)}
+              {isLoading ? <Skeleton className="w-24 h-7 my-0.5 ml-auto" /> : formatCurrency(remainingLimit)}
             </div>
           </div>
         </div>
 
         {/* Progress Bar */}
         <div className={`w-full h-3 rounded-full overflow-hidden ${isDark ? 'bg-[#26262b]' : 'bg-[#e5e3dc]'}`}>
-          <div
-            className="h-full rounded-full bg-[#c9b27c] transition-all duration-700 ease-out"
-            style={{ width: `${monthlyLimit > 0 ? Math.min(100, (totalSpent / monthlyLimit) * 100) : 0}%` }}
-          />
+          {isLoading ? (
+            <Skeleton className="w-full h-full rounded-full" />
+          ) : (
+            <div
+              className="h-full rounded-full bg-[#c9b27c] transition-all duration-700 ease-out"
+              style={{ width: `${monthlyLimit > 0 ? Math.min(100, (totalSpent / monthlyLimit) * 100) : 0}%` }}
+            />
+          )}
         </div>
         <div className="flex justify-between text-xs mt-2 font-medium">
           <span className="text-[#c9b27c]">
-            {monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of total cap utilized
+            {isLoading ? <Skeleton className="w-32 h-3" /> : `${monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of total cap utilized`}
           </span>
           <span className={isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}>
             8 days remaining in November
@@ -184,7 +186,34 @@ export default function BudgetPage() {
       </div>
 
       {/* Grid of Categories (Responsive 3 cols on desktop, 2 on tablet, 1 on mobile) */}
-      {budgetCategories.length === 0 ? (
+      {isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className={`p-5 rounded-2xl border transition-colors shadow-sm space-y-4 ${
+                isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
+              }`}
+            >
+              <div className="flex justify-between items-start">
+                <div className="space-y-1.5">
+                  <Skeleton className="w-28 h-4 rounded" />
+                  <Skeleton className="w-20 h-3 rounded" />
+                </div>
+                <Skeleton className="w-16 h-5 rounded-full" />
+              </div>
+              <div className="space-y-2">
+                <Skeleton className="w-32 h-6 rounded" />
+                <Skeleton className="w-full h-2 rounded-full" />
+              </div>
+              <div className="flex justify-between">
+                <Skeleton className="w-16 h-3 rounded" />
+                <Skeleton className="w-16 h-3 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : budgetCategories.length === 0 ? (
         <div
           className={`p-10 rounded-2xl border text-center transition-colors shadow-sm ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'

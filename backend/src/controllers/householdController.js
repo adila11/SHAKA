@@ -1,11 +1,9 @@
-import { User } from '../models/User.js';
-import { Transaction } from '../models/Transaction.js';
+import { dbStore } from '../data/dbStore.js';
 
 export const getMembers = async (req, res, next) => {
   try {
-    const users = await User.find().lean();
-    const safeUsers = users.map(({ passwordHash, _id, __v, ...user }) => user);
-    res.status(200).json({ success: true, data: safeUsers });
+    const users = await dbStore.users.find();
+    res.status(200).json({ success: true, data: users });
   } catch (error) {
     next(error);
   }
@@ -13,19 +11,18 @@ export const getMembers = async (req, res, next) => {
 
 export const getBalances = async (req, res, next) => {
   try {
-    const transactions = await Transaction.find().lean();
-    const users = await User.find().lean();
+    const transactions = await dbStore.transactions.find();
+    const users = await dbStore.users.find();
 
     const splitTxs = transactions.filter(t => t.isSplit);
 
     const spentByMember = {};
     users.forEach(u => {
-      const shortName = u.name ? u.name.split(' ')[0] : u.username;
-      spentByMember[shortName] = 0;
+      spentByMember[u.username] = 0;
     });
 
     splitTxs.forEach(t => {
-      const userKey = t.user || 'Alex';
+      const userKey = t.user || users[0]?.username || 'abdulshamil';
       spentByMember[userKey] = (spentByMember[userKey] || 0) + Number(t.amount || 0);
     });
 

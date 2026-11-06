@@ -25,7 +25,7 @@ export default function AddExpenseModal() {
       description: description || `${selectedCategory} expense`,
       date: 'Nov 22',
       time: 'Just now',
-      user: currentUser?.name?.split(' ')[0] || 'Alex',
+      user: currentUser?.username || 'abdulshamil',
     });
 
     setIsAddExpenseModalOpen(false);

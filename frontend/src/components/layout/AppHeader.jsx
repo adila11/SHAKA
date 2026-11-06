@@ -44,7 +44,7 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
             isDark ? 'text-[#8a8a93] group-hover:text-[#e8e8ea]' : 'text-[#71717a] group-hover:text-[#18181b]'
           }`}
         >
-          {currentUser?.name ? currentUser.name.split(' ')[0] : 'Member'}
+          {currentUser?.username || 'Member'}
         </span>
         <div
           className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm ${
@@ -53,7 +53,7 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
               : 'bg-white border-[#e5e3dc] text-[#c9b27c] group-hover:border-[#c9b27c]'
           }`}
         >
-          {currentUser?.initials || 'AR'}
+          {(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}
         </div>
       </button>
     </div>

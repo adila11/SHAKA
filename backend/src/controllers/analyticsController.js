@@ -1,11 +1,9 @@
-import { Transaction } from '../models/Transaction.js';
-import { Setting } from '../models/Setting.js';
+import { dbStore } from '../data/dbStore.js';
 
 export const getDashboardSummary = async (req, res, next) => {
   try {
-    const transactions = await Transaction.find().lean();
-    const setting = await Setting.findOne({ key: 'global' }).lean();
-    const monthlyLimit = setting?.monthlyLimit || 30000;
+    const transactions = await dbStore.transactions.find();
+    const monthlyLimit = await dbStore.budget.getMonthlyLimit();
 
     const totalSpent = transactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
     const remainingLimit = Math.max(0, monthlyLimit - totalSpent);

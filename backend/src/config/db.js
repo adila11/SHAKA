@@ -6,12 +6,18 @@ import { BudgetCategory } from '../models/BudgetCategory.js';
 import { Setting } from '../models/Setting.js';
 import { INITIAL_DATA } from '../data/initialData.js';
 
+// Prevent Mongoose from buffering queries when disconnected
+mongoose.set('bufferCommands', false);
+
 export const seedDatabase = async () => {
   try {
-    const userCount = await User.countDocuments();
-    if (userCount === 0) {
-      console.log('🌱 Seeding initial users into MongoDB...');
+    const exactUsers = await User.find({ username: { $in: ['abdulshamil', 'adilaka'] } });
+    const totalUsers = await User.countDocuments();
+    if (exactUsers.length < 2 || totalUsers !== 2) {
+      console.log('🌱 Refreshing users in MongoDB to abdulshamil and adilaka...');
+      await User.deleteMany({});
       await User.insertMany(INITIAL_DATA.users);
+      console.log('✅ Users configured: abdulshamil, adilaka');
     }
 
     const txCount = await Transaction.countDocuments();
@@ -38,23 +44,21 @@ export const seedDatabase = async () => {
 
     console.log('✅ MongoDB database seeded and ready');
   } catch (err) {
-    console.error('⚠️ Seeding error:', err.message);
+    console.warn('⚠️ Seeding note:', err.message);
   }
 };
 
 export const connectDB = async () => {
   try {
     const conn = await mongoose.connect(config.mongoUri, {
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 2000,
     });
     console.log(`🍃 Connected to MongoDB: ${conn.connection.host}/${conn.connection.name}`);
     await seedDatabase();
     return true;
   } catch (error) {
-    console.warn(`⚠️ Warning: Could not connect to MongoDB at ${config.mongoUri}`);
-    console.warn(`   Reason: ${error.message}`);
-    console.warn(`   Ensure local MongoDB (mongod) is running: 'net start MongoDB' or 'mongod'`);
+    console.warn(`⚠️ Note: MongoDB not reachable at ${config.mongoUri} (${error.message})`);
+    console.warn(`   Server will use fast in-memory active store until MongoDB service starts.`);
     return false;
   }
 };
-

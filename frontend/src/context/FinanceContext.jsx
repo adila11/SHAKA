@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
-import { api } from '../services/api';
+import { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { api, setAuthEventHandlers } from '../services/api';
 import { DEFAULT_USER, DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData';
 
 const FinanceContext = createContext();
@@ -10,6 +10,12 @@ export function FinanceProvider({ children }) {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(true);
   const [currentUser, setCurrentUser] = useState(DEFAULT_USER);
+
+  // Access Code Security & Session Management state
+  const [sessionInfo, setSessionInfo] = useState(null);
+  const [isAccessCodeEnabled, setIsAccessCodeEnabled] = useState(false);
+  const [isAccessCodeModalOpen, setIsAccessCodeModalOpen] = useState(false);
+  const [sessionExpiryNotice, setSessionExpiryNotice] = useState(null);
 
   const [transactions, setTransactions] = useState([]);
   const [budgetCategories, setBudgetCategories] = useState([]);
@@ -23,10 +29,46 @@ export function FinanceProvider({ children }) {
   const [isBackendConnected, setIsBackendConnected] = useState(null);
   const [error, setError] = useState(null);
 
-  // Re-fetch all data from backend API
+  const isFetchingRef = useRef(false);
+  const isHealthCheckingRef = useRef(false);
+
+  // Fetch Session Information from Backend
+  const fetchSessionInfo = useCallback(async () => {
+    try {
+      const res = await api.auth.getSessionInfo();
+      if (res.success && res.data) {
+        setSessionInfo(res.data);
+        setIsAccessCodeEnabled(Boolean(res.data.accessCodeEnabled));
+      }
+    } catch {
+      // Session info unavailable or not logged in
+    }
+  }, []);
+
+  // Listen for Token Expiration & Session Inactivity Expiration
+  useEffect(() => {
+    setAuthEventHandlers({
+      onRequiresAccessCode: () => {
+        setIsAccessCodeModalOpen(true);
+      },
+      onSessionExpired: (msg) => {
+        localStorage.removeItem('shaka_token');
+        localStorage.removeItem('shaka_refresh_token');
+        localStorage.removeItem('shaka_session_id');
+        setIsLoggedIn(false);
+        setSessionExpiryNotice(msg || 'Session expired. Please log in again.');
+        setCurrentScreen('login');
+      },
+    });
+  }, []);
+
+  // Optimized data fetch with in-flight request deduplication
   const refreshData = useCallback(async () => {
+    if (isFetchingRef.current) return;
+    isFetchingRef.current = true;
     setIsLoading(true);
     setError(null);
+
     try {
       const [txRes, catRes, limitRes, availRes, membersRes, balancesRes] = await Promise.allSettled([
         api.transactions.getAll(),
@@ -60,7 +102,7 @@ export function FinanceProvider({ children }) {
 
       if (membersRes.status === 'fulfilled' && membersRes.value.success && membersRes.value.data?.length) {
         setHouseholdMembers(membersRes.value.data);
-        const me = membersRes.value.data.find(u => u.username === 'alex_rivera') || membersRes.value.data[0];
+        const me = membersRes.value.data.find(u => u.username === 'abdulshamil') || membersRes.value.data[0];
         if (me) setCurrentUser(me);
       }
 
@@ -72,13 +114,18 @@ export function FinanceProvider({ children }) {
       setError(err.message);
       setIsBackendConnected(false);
     } finally {
+      isFetchingRef.current = false;
       setIsLoading(false);
     }
   }, []);
 
+  // Initial load only once on mount
   useEffect(() => {
     let ignore = false;
     async function initLoad() {
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+
       try {
         const [txRes, catRes, limitRes, availRes, membersRes, balancesRes] = await Promise.allSettled([
           api.transactions.getAll(),
@@ -109,7 +156,7 @@ export function FinanceProvider({ children }) {
           }
           if (membersRes.status === 'fulfilled' && membersRes.value.success && membersRes.value.data?.length) {
             setHouseholdMembers(membersRes.value.data);
-            const me = membersRes.value.data.find(u => u.username === 'alex_rivera') || membersRes.value.data[0];
+            const me = membersRes.value.data.find(u => u.username === 'abdulshamil') || membersRes.value.data[0];
             if (me) setCurrentUser(me);
           }
           if (balancesRes.status === 'fulfilled' && balancesRes.value.success) {
@@ -123,29 +170,36 @@ export function FinanceProvider({ children }) {
           setIsBackendConnected(false);
           setIsLoading(false);
         }
+      } finally {
+        isFetchingRef.current = false;
       }
     }
+
     initLoad();
     return () => {
       ignore = true;
     };
   }, []);
 
-  // Periodic health check heartbeat to ensure connection status is always real-time
+  // Smart background heartbeat: skips polling when tab is inactive to avoid unnecessary network traffic
   useEffect(() => {
-    const interval = setInterval(async () => {
+    const checkHealth = async () => {
+      // Don't poll if document is hidden / tab in background
+      if (typeof document !== 'undefined' && document.hidden) return;
+      if (isHealthCheckingRef.current) return;
+
+      isHealthCheckingRef.current = true;
       try {
         const res = await api.health.check();
-        if (res && res.status === 'healthy') {
-          setIsBackendConnected(true);
-        } else {
-          setIsBackendConnected(false);
-        }
+        setIsBackendConnected(Boolean(res && res.status === 'healthy'));
       } catch {
         setIsBackendConnected(false);
+      } finally {
+        isHealthCheckingRef.current = false;
       }
-    }, 8000);
+    };
 
+    const interval = setInterval(checkHealth, 15000); // 15-second light interval
     return () => clearInterval(interval);
   }, []);
 
@@ -186,7 +240,7 @@ export function FinanceProvider({ children }) {
   }, [transactions]);
 
   // Add Expense to backend
-  const addExpense = async ({ amount, category, description, date = 'Nov 22', time = 'Just now', user = 'Alex' }) => {
+  const addExpense = async ({ amount, category, description, date = 'Nov 22', time = 'Just now', user }) => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) return;
 
@@ -197,8 +251,7 @@ export function FinanceProvider({ children }) {
         description: description || 'New expense',
         date,
         time,
-        user: user || currentUser?.name?.split(' ')[0] || 'Alex',
-        userRole: currentUser?.role || 'Admin',
+        user: user || currentUser?.username || 'abdulshamil',
         isSplit: true,
       });
 
@@ -326,12 +379,24 @@ export function FinanceProvider({ children }) {
         if (res.token) {
           localStorage.setItem('shaka_token', res.token);
         }
+        if (res.refreshToken) {
+          localStorage.setItem('shaka_refresh_token', res.refreshToken);
+        }
+        if (res.sessionId) {
+          localStorage.setItem('shaka_session_id', res.sessionId);
+        }
+        if (res.sessionExpiresAt) {
+          localStorage.setItem('shaka_session_expires_at', res.sessionExpiresAt);
+        }
         if (res.user) {
           setCurrentUser(res.user);
+          setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
         }
+        setSessionExpiryNotice(null);
         setIsLoggedIn(true);
         setCurrentScreen('dashboard');
         refreshData();
+        fetchSessionInfo();
         return { success: true };
       }
       return { success: false, message: res.message || 'Login failed' };
@@ -341,10 +406,105 @@ export function FinanceProvider({ children }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('shaka_token');
-    setIsLoggedIn(false);
-    setCurrentScreen('login');
+  // User logout and session revocation
+  const logout = async () => {
+    const sessionId = localStorage.getItem('shaka_session_id');
+    try {
+      if (sessionId) {
+        await api.auth.logout({ sessionId, username: currentUser?.username });
+      }
+    } catch {
+      // Ignore network errors on logout
+    } finally {
+      localStorage.removeItem('shaka_token');
+      localStorage.removeItem('shaka_refresh_token');
+      localStorage.removeItem('shaka_session_id');
+      localStorage.removeItem('shaka_session_expires_at');
+      setSessionInfo(null);
+      setIsLoggedIn(false);
+      setCurrentScreen('login');
+    }
+  };
+
+  // Access Code Operations
+  const enableAccessCode = async (accessCode) => {
+    try {
+      const res = await api.auth.enableAccessCode({ accessCode });
+      if (res.success) {
+        setIsAccessCodeEnabled(true);
+        await fetchSessionInfo();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to enable access code' };
+    }
+  };
+
+  const changeAccessCode = async (currentAccessCode, newAccessCode) => {
+    try {
+      const res = await api.auth.changeAccessCode({ currentAccessCode, newAccessCode });
+      if (res.success) {
+        await fetchSessionInfo();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to change access code' };
+    }
+  };
+
+  const disableAccessCode = async (accessCode, password) => {
+    try {
+      const res = await api.auth.disableAccessCode({ accessCode, password });
+      if (res.success) {
+        setIsAccessCodeEnabled(false);
+        await fetchSessionInfo();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to disable access code' };
+    }
+  };
+
+  const resetAccessCode = async (password, newAccessCode) => {
+    try {
+      const res = await api.auth.resetAccessCode({ password, newAccessCode });
+      if (res.success) {
+        setIsAccessCodeEnabled(true);
+        await fetchSessionInfo();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to reset access code' };
+    }
+  };
+
+  const verifyAccessCode = async (accessCode) => {
+    const sessionId = localStorage.getItem('shaka_session_id');
+    if (!sessionId) {
+      return { success: false, message: 'No active session found. Please log in with password.' };
+    }
+
+    try {
+      const res = await api.auth.verifyAccessCode({ accessCode, sessionId });
+      if (res.success && res.token) {
+        localStorage.setItem('shaka_token', res.token);
+        if (res.refreshToken) {
+          localStorage.setItem('shaka_refresh_token', res.refreshToken);
+        }
+        setIsAccessCodeModalOpen(false);
+        await fetchSessionInfo();
+        return { success: true };
+      }
+      return { success: false, message: res.message || 'Verification failed' };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.data?.message || err.message || 'Invalid access code',
+        lockedOut: err.data?.lockedOut,
+        remainingAttempts: err.data?.remainingAttempts,
+        sessionExpired: err.data?.sessionExpired,
+      };
+    }
   };
 
   const navigateTo = screenName => {
@@ -369,6 +529,18 @@ export function FinanceProvider({ children }) {
         setIsLoggedIn,
         currentUser,
         setCurrentUser,
+        sessionInfo,
+        fetchSessionInfo,
+        isAccessCodeEnabled,
+        isAccessCodeModalOpen,
+        setIsAccessCodeModalOpen,
+        sessionExpiryNotice,
+        setSessionExpiryNotice,
+        enableAccessCode,
+        changeAccessCode,
+        disableAccessCode,
+        resetAccessCode,
+        verifyAccessCode,
         login,
         logout,
         transactions,

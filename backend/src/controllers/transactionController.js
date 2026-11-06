@@ -1,5 +1,4 @@
-import { Transaction } from '../models/Transaction.js';
-import { BudgetCategory } from '../models/BudgetCategory.js';
+import { dbStore } from '../data/dbStore.js';
 
 const getCategoryColor = (category) => {
   const cat = (category || '').toLowerCase();
@@ -15,39 +14,25 @@ export const getTransactions = async (req, res, next) => {
   try {
     const { category, search, user, isSplit, limit, offset } = req.query;
 
-    const filter = {};
-    if (category && category !== 'All') {
-      filter.category = new RegExp(`^${category}$`, 'i');
-    }
-    if (user) {
-      filter.user = new RegExp(`^${user}$`, 'i');
-    }
-    if (isSplit !== undefined) {
-      filter.isSplit = isSplit === 'true';
-    }
-    if (search) {
-      filter.$or = [
-        { description: { $regex: search, $options: 'i' } },
-        { category: { $regex: search, $options: 'i' } },
-        { user: { $regex: search, $options: 'i' } },
-      ];
-    }
+    const filter = {
+      category,
+      search,
+      user,
+      isSplit: isSplit !== undefined ? isSplit === 'true' : undefined,
+    };
 
-    const totalCount = await Transaction.countDocuments(filter);
-    let query = Transaction.find(filter).sort({ createdAt: -1 });
+    const list = await dbStore.transactions.find(filter);
+    const totalCount = list.length;
 
     const skip = parseInt(offset) || 0;
-    if (skip) query = query.skip(skip);
-    if (limit) query = query.limit(parseInt(limit));
-
-    const list = await query.lean();
-    const sanitized = list.map(({ _id, __v, ...item }) => item);
+    const end = limit ? skip + parseInt(limit) : undefined;
+    const paginated = end ? list.slice(skip, end) : list;
 
     res.status(200).json({
       success: true,
-      count: sanitized.length,
+      count: paginated.length,
       total: totalCount,
-      data: sanitized,
+      data: paginated,
     });
   } catch (error) {
     next(error);
@@ -56,13 +41,10 @@ export const getTransactions = async (req, res, next) => {
 
 export const getTransactionById = async (req, res, next) => {
   try {
-    const item = await Transaction.findOne({ id: req.params.id }).lean();
+    const item = await dbStore.transactions.findById(req.params.id);
     if (!item) {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
-    delete item._id;
-    delete item.__v;
-
     res.status(200).json({ success: true, data: item });
   } catch (error) {
     next(error);
@@ -77,7 +59,7 @@ export const createTransaction = async (req, res, next) => {
       description = 'New expense',
       date = 'Nov 22',
       time = 'Just now',
-      user = 'Alex',
+      user = 'abdulshamil',
       userRole = 'Admin',
       isSplit = true,
     } = req.body;
@@ -104,22 +86,8 @@ export const createTransaction = async (req, res, next) => {
       isSplit: Boolean(isSplit),
     };
 
-    await Transaction.create(newTx);
-
-    // Update corresponding budget category spent in MongoDB
-    const cat = await BudgetCategory.findOne({ category: new RegExp(`^${category}$`, 'i') });
-    if (cat) {
-      cat.spent += numAmount;
-      cat.status =
-        cat.spent > cat.limit
-          ? 'Limit reached'
-          : cat.spent >= cat.limit * 0.85
-          ? 'Near limit'
-          : 'Healthy';
-      cat.statusColor =
-        cat.status === 'Limit reached' ? '#d97070' : cat.status === 'Near limit' ? '#d4a359' : '#8fb39a';
-      await cat.save();
-    }
+    await dbStore.transactions.create(newTx);
+    await dbStore.budget.updateSpent(category, numAmount);
 
     res.status(201).json({
       success: true,
@@ -134,18 +102,11 @@ export const createTransaction = async (req, res, next) => {
 export const updateTransaction = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const updated = await Transaction.findOneAndUpdate(
-      { id },
-      { ...req.body },
-      { new: true }
-    ).lean();
+    const updated = await dbStore.transactions.update(id, req.body);
 
     if (!updated) {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
-
-    delete updated._id;
-    delete updated.__v;
 
     res.status(200).json({
       success: true,
@@ -160,9 +121,9 @@ export const updateTransaction = async (req, res, next) => {
 export const deleteTransaction = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const deleted = await Transaction.findOneAndDelete({ id });
+    const success = await dbStore.transactions.delete(id);
 
-    if (!deleted) {
+    if (!success) {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
 

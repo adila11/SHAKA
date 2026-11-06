@@ -1,13 +1,7 @@
 // Frontend utilities and fallback defaults (all transactions, budget categories, and limits load dynamically from the backend)
 
 export const DEFAULT_USER = {
-  name: 'Alex Rivera',
-  username: 'alex_rivera',
-  email: 'alex.rivera@shaka.ledgerly.io',
-  role: 'Ledger Shared Admin',
-  entriesCount: 0,
-  initials: 'AR',
-  avatarGradient: 'from-[#c9b27c] to-[#967f4c]',
+  username: 'abdulshamil',
 };
 
 export const DEFAULT_AVAILABLE_CATEGORIES = [

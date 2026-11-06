@@ -1,9 +1,10 @@
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 import { formatCurrency } from '../../data/financeData';
+import { Skeleton } from '../common/Skeleton';
 
 export default function StatCardsWidget({ customTheme = null }) {
-  const { totalSpent, todaySpent, todayLogsCount } = useFinance();
+  const { totalSpent, todaySpent, todayLogsCount, isLoading } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -22,7 +23,7 @@ export default function StatCardsWidget({ customTheme = null }) {
           Avg / Day
         </span>
         <span className={`text-sm font-black font-mono mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-          {formatCurrency(avgPerDay)}
+          {isLoading ? <Skeleton className="w-14 h-4 my-0.5" /> : formatCurrency(avgPerDay)}
         </span>
         <span className="text-[9px] text-[#8fb39a] font-medium mt-0.5">
           Stable
@@ -39,7 +40,7 @@ export default function StatCardsWidget({ customTheme = null }) {
           Today
         </span>
         <span className={`text-sm font-black font-mono mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-          {formatCurrency(todaySpent || 420)}
+          {isLoading ? <Skeleton className="w-14 h-4 my-0.5" /> : formatCurrency(todaySpent || 420)}
         </span>
         <span className="text-[9px] text-[#c9b27c] font-medium mt-0.5">
           {todayLogsCount || 2} logs

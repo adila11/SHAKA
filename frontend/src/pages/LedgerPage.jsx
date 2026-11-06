@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search, Filter } from 'lucide-react';
 import CategoryBadge from '../components/common/CategoryBadge';
-import BackendSyncBadge from '../components/common/BackendSyncBadge';
+import { Skeleton } from '../components/common/Skeleton';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function LedgerPage() {
-  const { transactions, totalSpent, setIsAddExpenseModalOpen, availableCategories } = useFinance();
+  const { transactions, totalSpent, setIsAddExpenseModalOpen, availableCategories, isLoading } = useFinance();
   const { isDark } = useTheme();
 
   const [selectedMonth, setSelectedMonth] = useState('Nov 2026');
@@ -33,9 +33,6 @@ export default function LedgerPage() {
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <BackendSyncBadge />
-            </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Ledger
             </h2>
@@ -81,7 +78,7 @@ export default function LedgerPage() {
                 Total:
               </span>
               <span className="text-sm font-extrabold font-mono text-[#c9b27c]">
-                {formatCurrency(totalSpent)}
+                {isLoading ? <Skeleton className="w-16 h-4" /> : formatCurrency(totalSpent)}
               </span>
             </div>
 
@@ -181,7 +178,16 @@ export default function LedgerPage() {
                 isDark ? 'divide-[#26262b]/60' : 'divide-[#e5e3dc]/80'
               }`}
             >
-              {filteredTransactions.length === 0 ? (
+              {isLoading ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} className="py-3">
+                    <td className="py-3.5 px-4"><Skeleton className="w-20 h-4" /></td>
+                    <td className="py-3.5 px-4"><Skeleton className="w-16 h-5 rounded-full" /></td>
+                    <td className="py-3.5 px-4"><Skeleton className="w-48 h-4" /></td>
+                    <td className="py-3.5 px-4 text-right"><Skeleton className="w-20 h-4 ml-auto" /></td>
+                  </tr>
+                ))
+              ) : filteredTransactions.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="py-8 text-center text-xs text-[#8a8a93]">
                     No transactions match your search filter.
@@ -222,7 +228,7 @@ export default function LedgerPage() {
         >
           <div className="flex items-center gap-3">
             <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Filtered Entries: {filteredTransactions.length}
+              Filtered Entries: {isLoading ? '...' : filteredTransactions.length}
             </span>
             <span className="text-xs text-[#8a8a93]">•</span>
             <span className="text-xs text-[#8fb39a] font-medium">All reconciled</span>
@@ -233,7 +239,7 @@ export default function LedgerPage() {
               Total Expenditure
             </span>
             <span className="text-xl font-extrabold font-mono text-[#c9b27c]">
-              {formatCurrency(totalSpent)}
+              {isLoading ? <Skeleton className="w-24 h-6" /> : formatCurrency(totalSpent)}
             </span>
           </div>
         </div>

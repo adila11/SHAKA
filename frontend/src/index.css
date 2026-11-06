@@ -54,3 +54,39 @@
   max-width: 390px;
   max-height: 844px;
 }
+
+/* Luxury Skeleton Shimmer Keyframes */
+@keyframes shimmerWave {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer-dark {
+  background: linear-gradient(
+    90deg,
+    #17171a 0%,
+    #222228 35%,
+    #2d2d36 50%,
+    #222228 65%,
+    #17171a 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s ease-in-out infinite;
+}
+
+.skeleton-shimmer-light {
+  background: linear-gradient(
+    90deg,
+    #f2f0eb 0%,
+    #e7e5de 35%,
+    #dedad1 50%,
+    #e7e5de 65%,
+    #f2f0eb 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s ease-in-out infinite;
+}

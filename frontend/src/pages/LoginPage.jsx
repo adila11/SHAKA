@@ -4,11 +4,11 @@ import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage() {
-  const { login, setCurrentScreen } = useFinance();
+  const { login, setCurrentScreen, sessionExpiryNotice } = useFinance();
   const { isDark } = useTheme();
 
-  const [username, setUsername] = useState('alex_rivera');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('abdulshamil');
+  const [password, setPassword] = useState('Abdul@3621');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,6 +50,13 @@ export default function LoginPage() {
             Multi-User Shared Personal Finance Tracker
           </p>
         </div>
+
+        {sessionExpiryNotice && (
+          <div className="mb-4 p-3 rounded-xl bg-[#d4a359]/15 border border-[#d4a359]/30 flex items-center gap-2 text-[#d4a359] text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{sessionExpiryNotice}</span>
+          </div>
+        )}
 
         {errorMessage && (
           <div className="mb-4 p-3 rounded-xl bg-[#d97070]/10 border border-[#d97070]/30 flex items-center gap-2 text-[#d97070] text-xs">
@@ -151,9 +158,31 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 pt-5 border-t border-[#26262b]/60 text-center">
-          <p className="text-xs text-[#8a8a93]">
-            Default Demo Credentials: <span className="font-mono text-[#c9b27c]">alex_rivera</span> / <span className="font-mono text-[#c9b27c]">password123</span>
+          <p className="text-xs text-[#8a8a93] mb-2.5">
+            Quick fill configured account:
           </p>
+          <div className="flex items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('abdulshamil');
+                setPassword('Abdul@3621');
+              }}
+              className="px-3 py-1.5 rounded-lg border border-[#c9b27c]/40 text-[#c9b27c] text-xs font-mono font-semibold hover:bg-[#c9b27c]/10 transition-colors cursor-pointer"
+            >
+              abdulshamil
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setUsername('adilaka');
+                setPassword('Adi;a@3621');
+              }}
+              className="px-3 py-1.5 rounded-lg border border-[#c9b27c]/40 text-[#c9b27c] text-xs font-mono font-semibold hover:bg-[#c9b27c]/10 transition-colors cursor-pointer"
+            >
+              adilaka
+            </button>
+          </div>
         </div>
       </div>
     </div>
