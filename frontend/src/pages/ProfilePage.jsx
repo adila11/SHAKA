@@ -12,15 +12,16 @@ import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function ProfilePage() {
-  const { currentUser, setCurrentScreen, setIsLoggedIn, transactions } = useFinance();
+  const { currentUser, logout, setCurrentScreen, transactions } = useFinance();
   const { isDark, setTheme } = useTheme();
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setCurrentScreen('login');
+    logout();
   };
 
-  const userTransactionsCount = transactions.filter((t) => t.user === 'Alex').length;
+  const userTransactionsCount = transactions.filter(
+    (t) => t.user === (currentUser?.name?.split(' ')[0] || 'Alex')
+  ).length;
 
   return (
     <div className="space-y-6 w-full">
@@ -59,18 +60,18 @@ export default function ProfilePage() {
             }`}
           >
             <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#c9b27c]/15">
-              {currentUser.initials}
+              {currentUser?.initials || 'AR'}
             </div>
             <h3 className={`text-lg font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              {currentUser.name}
+              {currentUser?.name || 'Alex Rivera'}
             </h3>
             <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              {currentUser.username} • {currentUser.email}
+              {currentUser?.username || 'alex_rivera'} • {currentUser?.email || 'alex.rivera@shaka.ledgerly.io'}
             </p>
 
             <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#c9b27c]/15 text-[#c9b27c] text-xs font-semibold border border-[#c9b27c]/30">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>{currentUser.role}</span>
+              <span>{currentUser?.role || 'Member'}</span>
             </div>
 
             {/* Metrics */}

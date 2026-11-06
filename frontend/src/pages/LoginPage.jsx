@@ -1,21 +1,34 @@
 import { useState } from 'react';
-import { User, Eye, EyeOff, ArrowRight } from 'lucide-react';
+import { User, Eye, EyeOff, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function LoginPage() {
-  const { setCurrentScreen, setIsLoggedIn } = useFinance();
+  const { login, setCurrentScreen } = useFinance();
   const { isDark } = useTheme();
 
   const [username, setUsername] = useState('alex_rivera');
   const [password, setPassword] = useState('password123');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setIsLoggedIn(true);
-    setCurrentScreen('dashboard');
+    setErrorMessage('');
+    setIsSubmitting(true);
+
+    try {
+      const res = await login(username, password);
+      if (!res.success) {
+        setErrorMessage(res.message || 'Invalid username or password');
+      }
+    } catch (err) {
+      setErrorMessage(err.message || 'Connection error. Please check backend server.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -38,6 +51,13 @@ export default function LoginPage() {
           </p>
         </div>
 
+        {errorMessage && (
+          <div className="mb-4 p-3 rounded-xl bg-[#d97070]/10 border border-[#d97070]/30 flex items-center gap-2 text-[#d97070] text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -49,6 +69,7 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
+                required
                 className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-[#c9b27c] transition-colors ${
                   isDark
                     ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
@@ -71,6 +92,7 @@ export default function LoginPage() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                required
                 className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-[#c9b27c] transition-colors ${
                   isDark
                     ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
@@ -111,16 +133,26 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="w-full h-12 mt-4 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-sm shadow-md shadow-[#c9b27c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+            disabled={isSubmitting}
+            className="w-full h-12 mt-4 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-sm shadow-md shadow-[#c9b27c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-60"
           >
-            <span>Log In</span>
-            <ArrowRight className="w-4 h-4" />
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Signing in...</span>
+              </>
+            ) : (
+              <>
+                <span>Log In</span>
+                <ArrowRight className="w-4 h-4" />
+              </>
+            )}
           </button>
         </form>
 
         <div className="mt-6 pt-5 border-t border-[#26262b]/60 text-center">
           <p className="text-xs text-[#8a8a93]">
-            Demo Credentials Pre-filled: <span className="font-mono text-[#c9b27c]">alex_rivera</span>
+            Default Demo Credentials: <span className="font-mono text-[#c9b27c]">alex_rivera</span> / <span className="font-mono text-[#c9b27c]">password123</span>
           </p>
         </div>
       </div>

@@ -118,7 +118,7 @@ export default function Navbar() {
               className="flex items-center gap-2 pl-1 group cursor-pointer"
             >
               <div className="w-8 h-8 rounded-full border border-[#26262b] bg-[#17171a] group-hover:border-[#c9b27c] text-[#c9b27c] font-bold text-xs flex items-center justify-center transition-colors shadow-sm">
-                {currentUser.initials}
+                {currentUser?.initials || 'AR'}
               </div>
             </button>
           ) : (

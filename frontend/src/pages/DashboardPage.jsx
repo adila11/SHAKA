@@ -9,7 +9,7 @@ import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function DashboardPage() {
-  const { currentUser, transactions, totalSpent, monthlyLimit, setCurrentScreen, setIsAddExpenseModalOpen } = useFinance();
+  const { currentUser, transactions, totalSpent, monthlyLimit, setCurrentScreen, setIsAddExpenseModalOpen, isLoading } = useFinance();
   const { isDark } = useTheme();
 
   const recentTransactions = transactions.slice(0, 5);
@@ -34,11 +34,11 @@ export default function DashboardPage() {
               <span className="w-1 h-1 rounded-full bg-[#8a8a93]" />
               <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] font-semibold border border-[#8fb39a]/30 flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" />
-                On Track
+                {isLoading ? 'Syncing with backend...' : 'Live Synced'}
               </span>
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              Welcome back, {currentUser.name.split(' ')[0]}
+              Welcome back, {currentUser?.name ? currentUser.name.split(' ')[0] : 'Member'}
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Financial ledger is active • Real-time overview of monthly limits and spending.
@@ -183,34 +183,40 @@ export default function DashboardPage() {
             </div>
 
             <div className="divide-y divide-[#26262b]/50">
-              {recentTransactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="py-3 flex items-center justify-between gap-3 group"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-[#202024] border border-[#26262b] flex items-center justify-center shrink-0">
-                      <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tx.categoryColor }} />
-                    </div>
-                    <div className="min-w-0">
-                      <p className={`text-xs font-bold truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                        {tx.description}
-                      </p>
-                      <p className="text-[11px] text-[#8a8a93] flex items-center gap-2 mt-0.5">
-                        <span>{tx.date}</span>
-                        <span>•</span>
-                        <CategoryBadge category={tx.category} customColor={tx.categoryColor} />
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="text-right shrink-0">
-                    <div className={`text-xs font-bold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                      {formatCurrency(tx.amount)}
-                    </div>
-                  </div>
+              {recentTransactions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#8a8a93]">
+                  No expenses recorded yet. Click below to add your first expense!
                 </div>
-              ))}
+              ) : (
+                recentTransactions.map((tx) => (
+                  <div
+                    key={tx.id}
+                    className="py-3 flex items-center justify-between gap-3 group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-[#202024] border border-[#26262b] flex items-center justify-center shrink-0">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: tx.categoryColor }} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className={`text-xs font-bold truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                          {tx.description}
+                        </p>
+                        <p className="text-[11px] text-[#8a8a93] flex items-center gap-2 mt-0.5">
+                          <span>{tx.date}</span>
+                          <span>•</span>
+                          <CategoryBadge category={tx.category} customColor={tx.categoryColor} />
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <div className={`text-xs font-bold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                        {formatCurrency(tx.amount)}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
 
             <button

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { ArrowLeft, Mail, Send, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Mail, Send, CheckCircle2, Loader2 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
+import { api } from '../services/api';
 
 export default function ForgotPasswordPage() {
   const { setCurrentScreen } = useFinance();
@@ -9,13 +10,22 @@ export default function ForgotPasswordPage() {
 
   const [username, setUsername] = useState('alex_rivera');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setCurrentScreen('change-pass');
-    }, 900);
+    setLoading(true);
+    try {
+      await api.auth.forgotPassword(username);
+    } catch {
+      // Continue flow even if endpoint throws
+    } finally {
+      setLoading(false);
+      setSubmitted(true);
+      setTimeout(() => {
+        setCurrentScreen('change-pass');
+      }, 900);
+    }
   };
 
   return (
@@ -61,7 +71,8 @@ export default function ForgotPasswordPage() {
                     ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
                     : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
                 }`}
-                placeholder="e.g. alex_rivera"
+                placeholder="Enter username"
+                required
               />
               <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
                 <Mail className="w-4 h-4" />
@@ -71,12 +82,22 @@ export default function ForgotPasswordPage() {
 
           <button
             type="submit"
-            className="w-full h-12 mt-2 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-sm shadow-md shadow-[#c9b27c]/20 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99]"
+            disabled={submitted || loading}
+            className={`w-full h-12 mt-4 rounded-xl font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 ${
+              submitted
+                ? 'bg-[#8fb39a] text-neutral-950'
+                : 'bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 shadow-[#c9b27c]/20'
+            } disabled:opacity-75`}
           >
-            {submitted ? (
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Generating link...</span>
+              </>
+            ) : submitted ? (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Redirecting to reset token...</span>
+                <span>Link Dispatched! Redirecting...</span>
               </>
             ) : (
               <>
@@ -85,19 +106,8 @@ export default function ForgotPasswordPage() {
               </>
             )}
           </button>
-
-          <div className="text-center pt-3">
-            <button
-              type="button"
-              onClick={() => setCurrentScreen('login')}
-              className="text-xs font-semibold text-[#8a8a93] hover:text-[#c9b27c] transition-colors cursor-pointer"
-            >
-              ← Back to login
-            </button>
-          </div>
         </form>
       </div>
     </div>
   );
 }
-

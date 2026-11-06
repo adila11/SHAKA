@@ -4,7 +4,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function AddExpenseModal() {
-  const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories } = useFinance();
+  const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories, currentUser } = useFinance();
   const { isDark } = useTheme();
 
   const [timing, setTiming] = useState('Spent now');
@@ -25,7 +25,7 @@ export default function AddExpenseModal() {
       description: description || `${selectedCategory} expense`,
       date: 'Nov 22',
       time: 'Just now',
-      user: 'Alex',
+      user: currentUser?.name?.split(' ')[0] || 'Alex',
     });
 
     setIsAddExpenseModalOpen(false);

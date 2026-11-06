@@ -180,8 +180,30 @@ export default function BudgetPage() {
       </div>
 
       {/* Grid of Categories (Responsive 3 cols on desktop, 2 on tablet, 1 on mobile) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {budgetCategories.map((cat) => {
+      {budgetCategories.length === 0 ? (
+        <div
+          className={`p-10 rounded-2xl border text-center transition-colors shadow-sm ${
+            isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
+          }`}
+        >
+          <p className={`text-sm font-semibold mb-2 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+            No budget categories found
+          </p>
+          <p className="text-xs text-[#8a8a93] mb-4">
+            Create custom spending categories to track category-specific spending limits.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-4 py-2 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Category</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {budgetCategories.map((cat) => {
           const isEditingThis = editingCatId === cat.id;
           const percent = cat.limit > 0 ? Math.round((cat.spent / cat.limit) * 100) : 0;
           const remaining = Math.max(0, cat.limit - cat.spent);
@@ -362,7 +384,8 @@ export default function BudgetPage() {
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
 
       {/* Add New Category Modal */}
       {isAddModalOpen && (
