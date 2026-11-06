@@ -13,6 +13,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
+const LogExpensePage = lazy(() => import('./pages/LogExpensePage'));
 const AllScreensGallery = lazy(() => import('./components/showcase/AllScreensGallery'));
 
 function PageLoadingFallback() {
@@ -62,6 +63,9 @@ function PageRouter() {
         return <DashboardPage />;
       case 'ledger':
         return <LedgerPage />;
+      case 'add-expense':
+      case 'log-expense':
+        return <LogExpensePage />;
       case 'budget':
         return <BudgetPage />;
       case 'profile':

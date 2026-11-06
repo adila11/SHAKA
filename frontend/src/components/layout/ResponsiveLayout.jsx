@@ -1,6 +1,5 @@
 import Navbar from './Navbar';
 import MobileNav from './MobileNav';
-import AddExpenseModal from '../modals/AddExpenseModal';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -24,9 +23,6 @@ export default function ResponsiveLayout({ children }) {
 
       {/* Mobile Floating Bottom Navigation */}
       {isLoggedIn && <MobileNav />}
-
-      {/* Universal Responsive Add Expense Modal */}
-      <AddExpenseModal />
 
       {/* Modern Desktop Footer */}
       <footer className="hidden md:block w-full border-t border-[#26262b]/80 py-6 text-xs text-[#8a8a93] transition-colors">

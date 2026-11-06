@@ -16,5 +16,7 @@ const budgetCategorySchema = new mongoose.Schema(
   }
 );
 
+budgetCategorySchema.index({ category: 1 });
+
 export const BudgetCategory = mongoose.model('BudgetCategory', budgetCategorySchema);
 

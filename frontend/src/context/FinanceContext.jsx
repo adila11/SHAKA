@@ -26,6 +26,7 @@ export function FinanceProvider({ children }) {
   const [householdBalances, setHouseholdBalances] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(null);
   const [error, setError] = useState(null);
 
@@ -62,11 +63,18 @@ export function FinanceProvider({ children }) {
     });
   }, []);
 
-  // Optimized data fetch with in-flight request deduplication
-  const refreshData = useCallback(async () => {
+  // Optimized data fetch with in-flight request deduplication & background preservation
+  const refreshData = useCallback(async (options = {}) => {
     if (isFetchingRef.current) return;
     isFetchingRef.current = true;
-    setIsLoading(true);
+
+    // Only trigger full skeleton loading if explicitly requested or initial data is absent
+    const showSkeleton = options.showLoading ?? false;
+    if (showSkeleton) {
+      setIsLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setError(null);
 
     try {
@@ -82,40 +90,54 @@ export function FinanceProvider({ children }) {
       const anySuccess = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].some(
         r => r.status === 'fulfilled' && r.value?.success
       );
-      setIsBackendConnected(anySuccess);
 
-      if (txRes.status === 'fulfilled' && txRes.value.success) {
+      if (anySuccess) {
+        setIsBackendConnected(true);
+      }
+
+      if (txRes.status === 'fulfilled' && txRes.value?.success) {
         setTransactions(txRes.value.data || []);
       }
 
-      if (catRes.status === 'fulfilled' && catRes.value.success) {
+      if (catRes.status === 'fulfilled' && catRes.value?.success) {
         setBudgetCategories(catRes.value.data || []);
       }
 
-      if (limitRes.status === 'fulfilled' && limitRes.value.success) {
+      if (limitRes.status === 'fulfilled' && limitRes.value?.success) {
         setMonthlyLimitState(limitRes.value.monthlyLimit || 0);
       }
 
-      if (availRes.status === 'fulfilled' && availRes.value.success && availRes.value.data?.length) {
+      if (availRes.status === 'fulfilled' && availRes.value?.success && availRes.value.data?.length) {
         setAvailableCategories(availRes.value.data);
       }
 
-      if (membersRes.status === 'fulfilled' && membersRes.value.success && membersRes.value.data?.length) {
+      if (membersRes.status === 'fulfilled' && membersRes.value?.success && membersRes.value.data?.length) {
         setHouseholdMembers(membersRes.value.data);
         const me = membersRes.value.data.find(u => u.username === 'abdulshamil') || membersRes.value.data[0];
         if (me) setCurrentUser(me);
       }
 
-      if (balancesRes.status === 'fulfilled' && balancesRes.value.success) {
+      if (balancesRes.status === 'fulfilled' && balancesRes.value?.success) {
         setHouseholdBalances(balancesRes.value.data || null);
+      }
+
+      if (!anySuccess) {
+        const firstError = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].find(
+          r => r.status === 'rejected'
+        );
+        if (firstError) {
+          setError(firstError.reason?.message || 'Failed to sync with backend');
+          setIsBackendConnected(false);
+        }
       }
     } catch (err) {
       console.warn('Failed to fetch from backend:', err);
-      setError(err.message);
+      setError(err.message || 'Unable to connect to backend');
       setIsBackendConnected(false);
     } finally {
       isFetchingRef.current = false;
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, []);
 
@@ -123,55 +145,9 @@ export function FinanceProvider({ children }) {
   useEffect(() => {
     let ignore = false;
     async function initLoad() {
-      if (isFetchingRef.current) return;
-      isFetchingRef.current = true;
-
-      try {
-        const [txRes, catRes, limitRes, availRes, membersRes, balancesRes] = await Promise.allSettled([
-          api.transactions.getAll(),
-          api.budget.getCategories(),
-          api.budget.getMonthlyLimit(),
-          api.budget.getAvailableCategories(),
-          api.household.getMembers(),
-          api.household.getBalances(),
-        ]);
-
-        if (!ignore) {
-          const anySuccess = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].some(
-            r => r.status === 'fulfilled' && r.value?.success
-          );
-          setIsBackendConnected(anySuccess);
-
-          if (txRes.status === 'fulfilled' && txRes.value.success) {
-            setTransactions(txRes.value.data || []);
-          }
-          if (catRes.status === 'fulfilled' && catRes.value.success) {
-            setBudgetCategories(catRes.value.data || []);
-          }
-          if (limitRes.status === 'fulfilled' && limitRes.value.success) {
-            setMonthlyLimitState(limitRes.value.monthlyLimit || 0);
-          }
-          if (availRes.status === 'fulfilled' && availRes.value.success && availRes.value.data?.length) {
-            setAvailableCategories(availRes.value.data);
-          }
-          if (membersRes.status === 'fulfilled' && membersRes.value.success && membersRes.value.data?.length) {
-            setHouseholdMembers(membersRes.value.data);
-            const me = membersRes.value.data.find(u => u.username === 'abdulshamil') || membersRes.value.data[0];
-            if (me) setCurrentUser(me);
-          }
-          if (balancesRes.status === 'fulfilled' && balancesRes.value.success) {
-            setHouseholdBalances(balancesRes.value.data || null);
-          }
-          setIsLoading(false);
-        }
-      } catch (err) {
-        if (!ignore) {
-          setError(err.message);
-          setIsBackendConnected(false);
-          setIsLoading(false);
-        }
-      } finally {
-        isFetchingRef.current = false;
+      await refreshData({ showLoading: true });
+      if (!ignore) {
+        fetchSessionInfo();
       }
     }
 
@@ -179,29 +155,57 @@ export function FinanceProvider({ children }) {
     return () => {
       ignore = true;
     };
+  }, [refreshData, fetchSessionInfo]);
+
+  // Health check worker: unauthenticated health check that does NOT slide user session
+  const checkHealth = useCallback(async () => {
+    if (typeof document !== 'undefined' && document.hidden) return;
+    if (isHealthCheckingRef.current) return;
+
+    isHealthCheckingRef.current = true;
+    try {
+      const res = await api.health.check();
+      const isOnline = Boolean(res && (res.status === 'healthy' || res.status === 'degraded' || res.success));
+      setIsBackendConnected(isOnline);
+      return isOnline;
+    } catch {
+      setIsBackendConnected(false);
+      return false;
+    } finally {
+      isHealthCheckingRef.current = false;
+    }
   }, []);
 
-  // Smart background heartbeat: skips polling when tab is inactive to avoid unnecessary network traffic
+  // Background health check & window visibility / network status handlers
   useEffect(() => {
-    const checkHealth = async () => {
-      // Don't poll if document is hidden / tab in background
-      if (typeof document !== 'undefined' && document.hidden) return;
-      if (isHealthCheckingRef.current) return;
-
-      isHealthCheckingRef.current = true;
-      try {
-        const res = await api.health.check();
-        setIsBackendConnected(Boolean(res && res.status === 'healthy'));
-      } catch {
-        setIsBackendConnected(false);
-      } finally {
-        isHealthCheckingRef.current = false;
-      }
+    const onOnline = () => {
+      checkHealth();
+      refreshData({ showLoading: false });
     };
 
-    const interval = setInterval(checkHealth, 15000); // 15-second light interval
-    return () => clearInterval(interval);
-  }, []);
+    const onFocus = () => {
+      checkHealth();
+    };
+
+    window.addEventListener('online', onOnline);
+    window.addEventListener('focus', onFocus);
+
+    const interval = setInterval(checkHealth, 25000); // 25-second gentle check
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('online', onOnline);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [checkHealth, refreshData]);
+
+  // Explicit retry connection action for UI error recovery
+  const retryConnection = useCallback(async () => {
+    setError(null);
+    const healthy = await checkHealth();
+    await refreshData({ showLoading: transactions.length === 0 });
+    return healthy;
+  }, [checkHealth, refreshData, transactions.length]);
 
   // Derived financial metrics computed from real data
   const totalSpent = useMemo(() => {
@@ -217,15 +221,21 @@ export function FinanceProvider({ children }) {
     return Number(((totalSpent / monthlyLimit) * 100).toFixed(1));
   }, [totalSpent, monthlyLimit]);
 
-  // Today's spend calculation (matching current day or reference date)
+  // Today's spend calculation (matching current day, reference date, or 'Just now')
   const todaySpent = useMemo(() => {
+    const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const todayStr = `${todayMonths[now.getMonth()]} ${now.getDate()}`;
     return transactions
-      .filter(t => t.date === 'Nov 22' || t.time === 'Just now')
+      .filter(t => t.date === todayStr || t.date === 'Nov 22' || t.time === 'Just now')
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   }, [transactions]);
 
   const todayLogsCount = useMemo(() => {
-    return transactions.filter(t => t.date === 'Nov 22' || t.time === 'Just now').length;
+    const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const todayStr = `${todayMonths[now.getMonth()]} ${now.getDate()}`;
+    return transactions.filter(t => t.date === todayStr || t.date === 'Nov 22' || t.time === 'Just now').length;
   }, [transactions]);
 
   // Category breakdown for charts and budget calculations
@@ -240,9 +250,11 @@ export function FinanceProvider({ children }) {
   }, [transactions]);
 
   // Add Expense to backend
-  const addExpense = async ({ amount, category, description, date = 'Nov 22', time = 'Just now', user }) => {
+  const addExpense = async ({ amount, category, description, date = 'Nov 22', fullDate, time = 'Just now', user }) => {
     const numAmount = Number(amount);
-    if (!numAmount || numAmount <= 0) return;
+    if (!numAmount || numAmount <= 0) {
+      return { success: false, message: 'Valid positive amount is required' };
+    }
 
     try {
       const res = await api.transactions.create({
@@ -250,6 +262,7 @@ export function FinanceProvider({ children }) {
         category: category || 'Food',
         description: description || 'New expense',
         date,
+        fullDate,
         time,
         user: user || currentUser?.username || 'abdulshamil',
         isSplit: true,
@@ -277,24 +290,26 @@ export function FinanceProvider({ children }) {
             return cat;
           })
         );
+        setIsAddExpenseModalOpen(false);
+        return { success: true, data: res.data };
       }
+      return { success: false, message: res.message || 'Failed to log expense' };
     } catch (err) {
       console.error('Failed to add expense:', err);
       setIsBackendConnected(false);
-    } finally {
-      setIsAddExpenseModalOpen(false);
+      return { success: false, message: err.message || 'Network error while adding expense' };
     }
   };
 
   // Update category limit via backend API
   const updateCategoryLimit = async (categoryId, newLimit) => {
-    await updateCategory(categoryId, { limit: newLimit });
+    return updateCategory(categoryId, { limit: newLimit });
   };
 
   // Add category via backend API
   const addCategory = async ({ name, limit, color }) => {
     const trimmedName = name ? name.trim() : '';
-    if (!trimmedName) return;
+    if (!trimmedName) return { success: false, message: 'Category name is required' };
 
     try {
       const res = await api.budget.addCategory({
@@ -310,10 +325,13 @@ export function FinanceProvider({ children }) {
           if (prev.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) return prev;
           return [...prev, { name: trimmedName, color: color || '#c9b27c' }];
         });
+        return { success: true, data: res.data };
       }
+      return { success: false, message: res.message || 'Failed to create category' };
     } catch (err) {
       console.error('Failed to add category:', err);
       setIsBackendConnected(false);
+      return { success: false, message: err.message || 'Failed to add category' };
     }
   };
 
@@ -326,10 +344,13 @@ export function FinanceProvider({ children }) {
         setBudgetCategories(prev =>
           prev.map(cat => (cat.id === categoryId ? res.data : cat))
         );
+        return { success: true, data: res.data };
       }
+      return { success: false, message: res.message || 'Failed to update category' };
     } catch (err) {
       console.error('Failed to update category:', err);
       setIsBackendConnected(false);
+      return { success: false, message: err.message || 'Failed to update category' };
     }
   };
 
@@ -346,27 +367,33 @@ export function FinanceProvider({ children }) {
             prev.filter(c => c.name.toLowerCase() !== catToDelete.name.toLowerCase())
           );
         }
+        return { success: true };
       }
+      return { success: false, message: res.message || 'Failed to delete category' };
     } catch (err) {
       console.error('Failed to delete category:', err);
       setIsBackendConnected(false);
+      return { success: false, message: err.message || 'Failed to delete category' };
     }
   };
 
   // Update monthly limit via backend API
   const setMonthlyLimit = async (newLimit) => {
     const num = Number(newLimit);
-    if (isNaN(num) || num <= 0) return;
+    if (isNaN(num) || num <= 0) return { success: false, message: 'Invalid limit amount' };
 
     try {
       const res = await api.budget.updateMonthlyLimit(num);
       if (res.success) {
         setIsBackendConnected(true);
         setMonthlyLimitState(num);
+        return { success: true };
       }
+      return { success: false, message: res.message || 'Failed to update limit' };
     } catch (err) {
       console.error('Failed to update monthly limit:', err);
       setIsBackendConnected(false);
+      return { success: false, message: err.message || 'Failed to update limit' };
     }
   };
 
@@ -395,8 +422,8 @@ export function FinanceProvider({ children }) {
         setSessionExpiryNotice(null);
         setIsLoggedIn(true);
         setCurrentScreen('dashboard');
-        refreshData();
-        fetchSessionInfo();
+        await refreshData({ showLoading: true });
+        await fetchSessionInfo();
         return { success: true };
       }
       return { success: false, message: res.message || 'Login failed' };
@@ -423,6 +450,44 @@ export function FinanceProvider({ children }) {
       setSessionInfo(null);
       setIsLoggedIn(false);
       setCurrentScreen('login');
+    }
+  };
+
+  // Update User Profile (Username & Avatar)
+  const updateProfile = async ({ username: newUsername, avatar }) => {
+    try {
+      const res = await api.auth.updateProfile({ username: newUsername, avatar });
+      if (res.success) {
+        if (res.token) {
+          localStorage.setItem('shaka_token', res.token);
+        }
+        if (res.user) {
+          setCurrentUser(prev => ({ ...prev, ...res.user }));
+        }
+        if (newUsername) {
+          setHouseholdMembers(prev =>
+            prev.map(m =>
+              m.username === currentUser.username
+                ? { ...m, username: newUsername, avatar: res.user?.avatar !== undefined ? res.user.avatar : m.avatar }
+                : m
+            )
+          );
+          setTransactions(prev =>
+            prev.map(t =>
+              t.user?.toLowerCase() === currentUser.username.toLowerCase()
+                ? { ...t, user: newUsername }
+                : t
+            )
+          );
+        }
+        return { success: true, message: res.message || 'Profile updated successfully', user: res.user };
+      }
+      return { success: false, message: res.message || 'Failed to update profile' };
+    } catch (err) {
+      return {
+        success: false,
+        message: err.data?.message || err.message || 'Error updating profile',
+      };
     }
   };
 
@@ -508,11 +573,7 @@ export function FinanceProvider({ children }) {
   };
 
   const navigateTo = screenName => {
-    if (screenName === 'add-expense') {
-      setIsAddExpenseModalOpen(true);
-    } else {
-      setCurrentScreen(screenName);
-    }
+    setCurrentScreen(screenName);
   };
 
   return (
@@ -543,6 +604,7 @@ export function FinanceProvider({ children }) {
         verifyAccessCode,
         login,
         logout,
+        updateProfile,
         transactions,
         budgetCategories,
         availableCategories,
@@ -562,9 +624,12 @@ export function FinanceProvider({ children }) {
         updateCategory,
         deleteCategory,
         isLoading,
+        isRefreshing,
         isBackendConnected,
         error,
         refreshData,
+        checkHealth,
+        retryConnection,
       }}
     >
       {children}

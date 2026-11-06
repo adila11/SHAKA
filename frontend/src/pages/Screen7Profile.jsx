@@ -31,14 +31,18 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
-          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-xl font-bold flex items-center justify-center mx-auto mb-3 shadow-md shadow-[#c9b27c]/10">
-            {currentUser.initials}
+          <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-xl font-bold flex items-center justify-center mx-auto mb-3 shadow-md shadow-[#c9b27c]/10 overflow-hidden">
+            {currentUser?.avatar ? (
+              <img src={currentUser.avatar} alt={currentUser?.username || 'Profile'} className="w-full h-full object-cover" />
+            ) : (
+              (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
+            )}
           </div>
-          <h3 className={`text-base font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {currentUser.name}
+          <h3 className={`text-base font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+            {currentUser?.username || 'abdulshamil'}
           </h3>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            {currentUser.username} • {currentUser.entriesCount} entries logged
+            Multi-User Shared Ledger Admin
           </p>
           <div className="mt-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#c9b27c]/15 text-[#c9b27c] text-[10px] font-semibold">
             <ShieldCheck className="w-3 h-3" />

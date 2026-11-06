@@ -75,7 +75,7 @@ export const createTransaction = async (req, res, next) => {
     const newTx = {
       id: `tx-${Date.now()}`,
       date,
-      fullDate: `${date}, 2026`,
+      fullDate: req.body.fullDate || (date.includes(',') ? date : `${date}, 2026`),
       time,
       category,
       categoryColor: getCategoryColor(category),

@@ -3,12 +3,13 @@ import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function ShakaHeader() {
-  const { currentScreen, setCurrentScreen, viewMode, setViewMode, setIsAddExpenseModalOpen } = useFinance();
+  const { currentScreen, setCurrentScreen, viewMode, setViewMode } = useFinance();
   const { setTheme, isDark } = useTheme();
 
   const screens = [
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'ledger', label: 'Ledger' },
+    { id: 'add-expense', label: 'Log Expense' },
     { id: 'budget', label: 'Budget' },
     { id: 'profile', label: 'Profile' },
     { id: 'login', label: 'Login' },
@@ -64,7 +65,7 @@ export default function ShakaHeader() {
         {/* Quick Add Button */}
         <button
           type="button"
-          onClick={() => setIsAddExpenseModalOpen(true)}
+          onClick={() => setCurrentScreen('add-expense')}
           className="px-3 py-1.5 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
         >
           <Plus className="w-3.5 h-3.5 stroke-[3]" />

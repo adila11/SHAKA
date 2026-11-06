@@ -7,7 +7,7 @@ import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function LedgerPage() {
-  const { transactions, totalSpent, setIsAddExpenseModalOpen, availableCategories, isLoading } = useFinance();
+  const { transactions, totalSpent, setCurrentScreen, availableCategories, isLoading } = useFinance();
   const { isDark } = useTheme();
 
   const [selectedMonth, setSelectedMonth] = useState('Nov 2026');
@@ -85,7 +85,7 @@ export default function LedgerPage() {
             {/* Log Expense Button */}
             <button
               type="button"
-              onClick={() => setIsAddExpenseModalOpen(true)}
+              onClick={() => setCurrentScreen('add-expense')}
               className="px-3.5 py-2 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />

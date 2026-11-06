@@ -29,7 +29,7 @@ export const dbStore = {
   users: {
     find: async () => {
       if (isDbConnected()) {
-        return User.find().select('username accessCodeEnabled createdAt updatedAt').lean();
+        return User.find().select('username avatar accessCodeEnabled createdAt updatedAt').lean();
       }
       return memState.users.map(({ password, accessCodeHash, sessions, ...u }) => u);
     },
@@ -47,6 +47,42 @@ export const dbStore = {
       }
       const match = memState.users.find(u => u.sessions?.some(s => s.sessionId === sessionId));
       return match ? { ...match, toObject: () => ({ ...match }) } : null;
+    },
+    updateProfile: async (currentUsername, { newUsername, avatar }) => {
+      const updates = {};
+      if (newUsername) updates.username = newUsername;
+      if (avatar !== undefined) updates.avatar = avatar;
+      updates.updatedAt = new Date().toISOString();
+
+      if (isDbConnected()) {
+        const updated = await User.findOneAndUpdate(
+          { username: currentUsername },
+          { $set: updates },
+          { new: true }
+        ).lean();
+
+        if (newUsername && newUsername.toLowerCase() !== currentUsername.toLowerCase()) {
+          await Transaction.updateMany({ user: currentUsername }, { $set: { user: newUsername } });
+        }
+        return updated;
+      }
+
+      const memUser = memState.users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase());
+      if (memUser) {
+        if (newUsername) memUser.username = newUsername;
+        if (avatar !== undefined) memUser.avatar = avatar;
+        memUser.updatedAt = updates.updatedAt;
+      }
+
+      if (newUsername && newUsername.toLowerCase() !== currentUsername.toLowerCase()) {
+        memState.transactions.forEach(t => {
+          if (t.user.toLowerCase() === currentUsername.toLowerCase()) {
+            t.user = newUsername;
+          }
+        });
+      }
+
+      return memUser || { username: newUsername || currentUsername, avatar };
     },
     updatePassword: async (username, newHash) => {
       if (isDbConnected()) {

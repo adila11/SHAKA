@@ -18,7 +18,6 @@ export default function DashboardPage() {
     monthlyLimit,
     householdMembers,
     setCurrentScreen,
-    setIsAddExpenseModalOpen,
     isLoading,
   } = useFinance();
   const { isDark } = useTheme();
@@ -56,7 +55,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsAddExpenseModalOpen(true)}
+              onClick={() => setCurrentScreen('add-expense')}
               className="px-4 py-2.5 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-2 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -246,7 +245,7 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              onClick={() => setIsAddExpenseModalOpen(true)}
+              onClick={() => setCurrentScreen('add-expense')}
               className="w-full mt-4 py-2.5 rounded-xl border border-dashed border-[#26262b] hover:border-[#c9b27c] text-xs font-semibold text-[#8a8a93] hover:text-[#c9b27c] transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />

@@ -3,7 +3,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function MobileNav() {
-  const { currentScreen, setCurrentScreen, setIsAddExpenseModalOpen } = useFinance();
+  const { currentScreen, setCurrentScreen } = useFinance();
   const { isDark } = useTheme();
 
   const navItems = [
@@ -28,7 +28,7 @@ export default function MobileNav() {
             <div key={item.id} className="flex-1 flex justify-center -mt-6">
               <button
                 type="button"
-                onClick={() => setIsAddExpenseModalOpen(true)}
+                onClick={() => setCurrentScreen('add-expense')}
                 className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 flex items-center justify-center shadow-lg shadow-[#c9b27c]/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                 aria-label="Add Expense"
               >

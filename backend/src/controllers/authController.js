@@ -112,6 +112,7 @@ export const login = async (req, res, next) => {
       accessCodeEnabled: Boolean(user.accessCodeEnabled),
       user: {
         username: user.username,
+        avatar: user.avatar || '',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -666,6 +667,7 @@ export const getMe = async (req, res, next) => {
       success: true,
       user: {
         username: user.username,
+        avatar: user.avatar || '',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -704,6 +706,76 @@ export const changePassword = async (req, res, next) => {
     res.status(200).json({
       success: true,
       message: 'Password successfully updated',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 11. Update Profile (Username & Avatar)
+export const updateProfile = async (req, res, next) => {
+  try {
+    const { username: newUsername, avatar } = req.body;
+    const currentUsername = req.user.username;
+
+    if (!newUsername && avatar === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: 'No profile updates provided',
+      });
+    }
+
+    const trimmedUsername = newUsername ? String(newUsername).trim() : currentUsername;
+    if (trimmedUsername.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username must be at least 3 characters long',
+      });
+    }
+
+    // Check if new username is already taken by another user
+    if (trimmedUsername.toLowerCase() !== currentUsername.toLowerCase()) {
+      const existing = await dbStore.users.findByUsername(trimmedUsername);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: 'Username is already taken by another account',
+          errorCode: 'DUPLICATE_RESOURCE',
+        });
+      }
+    }
+
+    const updatedUser = await dbStore.users.updateProfile(currentUsername, {
+      newUsername: trimmedUsername,
+      avatar,
+    });
+
+    // Re-issue JWT token if username changed
+    let token = undefined;
+    if (trimmedUsername.toLowerCase() !== currentUsername.toLowerCase()) {
+      token = jwt.sign(
+        {
+          id: req.user.id || trimmedUsername,
+          username: trimmedUsername,
+          sessionId: req.session?.sessionId,
+          type: 'access',
+        },
+        config.jwtSecret,
+        { expiresIn: '24h' }
+      );
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      token,
+      user: {
+        username: updatedUser.username,
+        avatar: updatedUser.avatar || '',
+        accessCodeEnabled: Boolean(updatedUser.accessCodeEnabled),
+        createdAt: updatedUser.createdAt,
+        updatedAt: updatedUser.updatedAt,
+      },
     });
   } catch (error) {
     next(error);

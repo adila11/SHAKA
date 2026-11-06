@@ -47,13 +47,17 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
           {currentUser?.username || 'Member'}
         </span>
         <div
-          className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm ${
+          className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm overflow-hidden ${
             isDark
               ? 'bg-[#17171a] border-[#26262b] text-[#c9b27c] group-hover:border-[#c9b27c]'
               : 'bg-white border-[#e5e3dc] text-[#c9b27c] group-hover:border-[#c9b27c]'
           }`}
         >
-          {(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}
+          {currentUser?.avatar ? (
+            <img src={currentUser.avatar} alt={currentUser.username} className="w-full h-full object-cover" />
+          ) : (
+            (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
+          )}
         </div>
       </button>
     </div>

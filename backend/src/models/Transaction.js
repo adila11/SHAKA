@@ -10,14 +10,18 @@ const transactionSchema = new mongoose.Schema(
     categoryColor: { type: String, default: '#c9b27c' },
     description: { type: String, required: true },
     amount: { type: Number, required: true },
-    user: { type: String, required: true, default: 'Alex' },
-    userRole: { type: String, default: 'Member' },
+    user: { type: String, required: true, default: 'abdulshamil' },
+    userRole: { type: String, default: 'Admin' },
     isSplit: { type: Boolean, default: true },
   },
   {
     timestamps: true,
   }
 );
+
+transactionSchema.index({ category: 1 });
+transactionSchema.index({ user: 1 });
+transactionSchema.index({ createdAt: -1 });
 
 export const Transaction = mongoose.model('Transaction', transactionSchema);
 

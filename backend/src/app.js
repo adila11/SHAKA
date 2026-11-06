@@ -8,6 +8,7 @@ import budgetRoutes from './routes/budgetRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import householdRoutes from './routes/householdRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+import { isDbConnected } from './data/dbStore.js';
 
 const app = express();
 
@@ -20,8 +21,8 @@ app.use(
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
-    exposedHeaders: ['Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'X-Session-Id'],
+    exposedHeaders: ['Authorization', 'X-Session-Id'],
   })
 );
 
@@ -34,10 +35,13 @@ if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
 
-// Health check endpoint
+// Health check endpoint with genuine database connectivity reporting
 app.get('/api/health', (req, res) => {
+  const dbConnected = isDbConnected();
   res.status(200).json({
-    status: 'healthy',
+    success: true,
+    status: dbConnected ? 'healthy' : 'degraded',
+    database: dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     service: 'SHAKA Express Backend API',
     version: '1.0.0',

@@ -15,7 +15,9 @@ import {
   X,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  Pencil
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
@@ -32,6 +34,7 @@ export default function ProfilePage() {
     changeAccessCode,
     disableAccessCode,
     resetAccessCode,
+    updateProfile,
   } = useFinance();
   const { isDark, setTheme } = useTheme();
 
@@ -46,6 +49,84 @@ export default function ProfilePage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
+
+  // Profile Picture & Username Edit states
+  const [isEditingUsername, setIsEditingUsername] = useState(false);
+  const [editUsernameValue, setEditUsernameValue] = useState(currentUser?.username || '');
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileFeedback, setProfileFeedback] = useState(null);
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileFeedback({ type: 'error', message: 'Please select an image file.' });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      setProfileFeedback({ type: 'error', message: 'Image size should be less than 2MB.' });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result;
+      setIsSavingProfile(true);
+      setProfileFeedback(null);
+      const res = await updateProfile({ avatar: base64Data });
+      setIsSavingProfile(false);
+      if (res.success) {
+        setProfileFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
+        setTimeout(() => setProfileFeedback(null), 3000);
+      } else {
+        setProfileFeedback({ type: 'error', message: res.message || 'Failed to update photo.' });
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = async () => {
+    setIsSavingProfile(true);
+    setProfileFeedback(null);
+    const res = await updateProfile({ avatar: '' });
+    setIsSavingProfile(false);
+    if (res.success) {
+      setProfileFeedback({ type: 'success', message: 'Profile picture removed.' });
+      setTimeout(() => setProfileFeedback(null), 3000);
+    } else {
+      setProfileFeedback({ type: 'error', message: res.message || 'Failed to remove photo.' });
+    }
+  };
+
+  const handleSaveUsername = async (e) => {
+    e?.preventDefault();
+    const trimmed = editUsernameValue.trim().toLowerCase();
+    if (!trimmed || trimmed.length < 3) {
+      setProfileFeedback({ type: 'error', message: 'Username must be at least 3 characters long.' });
+      return;
+    }
+
+    if (trimmed === currentUser?.username?.toLowerCase()) {
+      setIsEditingUsername(false);
+      return;
+    }
+
+    setIsSavingProfile(true);
+    setProfileFeedback(null);
+    const res = await updateProfile({ username: trimmed });
+    setIsSavingProfile(false);
+
+    if (res.success) {
+      setProfileFeedback({ type: 'success', message: 'Username updated successfully!' });
+      setIsEditingUsername(false);
+      setTimeout(() => setProfileFeedback(null), 3000);
+    } else {
+      setProfileFeedback({ type: 'error', message: res.message || 'Failed to update username.' });
+    }
+  };
 
   useEffect(() => {
     fetchSessionInfo();
@@ -208,43 +289,152 @@ export default function ProfilePage() {
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
             }`}
           >
-            <div className="w-20 h-20 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center mx-auto mb-4 shadow-lg shadow-[#c9b27c]/15">
-              {(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}
-            </div>
-            <h3 className={`text-lg font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              {currentUser?.username || 'abdulshamil'}
-            </h3>
-            <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Account ID • MongoDB Authenticated
-            </p>
+            {/* Avatar with Photo Upload Overlay */}
+            <div className="relative w-24 h-24 mx-auto mb-3">
+              <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center shadow-lg shadow-[#c9b27c]/15">
+                {currentUser?.avatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser?.username || 'Profile'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span>{(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}</span>
+                )}
+              </div>
 
-            {/* Metrics */}
-            <div className="grid grid-cols-2 gap-3 mt-6 pt-5 border-t border-[#26262b]/60">
-              <div
-                className={`p-3 rounded-xl border ${
-                  isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
-                }`}
+              {/* Upload Button Overlay */}
+              <label
+                htmlFor="profile-avatar-upload"
+                title="Upload Profile Picture"
+                className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#c9b27c] text-neutral-950 flex items-center justify-center cursor-pointer shadow-md hover:scale-110 active:scale-95 transition-all"
               >
-                <span className="text-[10px] text-[#8a8a93] uppercase tracking-wider block">
-                  Created At
-                </span>
-                <span className={`text-xs font-semibold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                  {currentUser?.createdAt ? new Date(currentUser.createdAt).toLocaleDateString() : 'Live'}
-                </span>
-              </div>
-              <div
-                className={`p-3 rounded-xl border ${
-                  isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
-                }`}
-              >
-                <span className="text-[10px] text-[#8a8a93] uppercase tracking-wider block">
-                  Session
-                </span>
-                <span className={`text-xs font-bold font-mono text-[#8fb39a]`}>
-                  Active
-                </span>
-              </div>
+                {isSavingProfile ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 stroke-[2.5]" />
+                )}
+                <input
+                  id="profile-avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                  disabled={isSavingProfile}
+                />
+              </label>
             </div>
+
+            {/* Photo Action Links */}
+            <div className="flex items-center justify-center gap-3 mb-3">
+              <label
+                htmlFor="profile-avatar-upload"
+                className="text-[11px] font-semibold text-[#c9b27c] hover:underline cursor-pointer"
+              >
+                {currentUser?.avatar ? 'Change photo' : 'Add photo'}
+              </label>
+              {currentUser?.avatar && (
+                <>
+                  <span className="text-[#8a8a93] text-xs">•</span>
+                  <button
+                    type="button"
+                    onClick={handleRemovePhoto}
+                    disabled={isSavingProfile}
+                    className="text-[11px] font-semibold text-[#d97070] hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Feedback Alert for Profile Actions */}
+            {profileFeedback && (
+              <div
+                className={`mb-3 p-2.5 rounded-xl text-xs flex items-center justify-center gap-2 ${
+                  profileFeedback.type === 'success'
+                    ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                    : 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                }`}
+              >
+                {profileFeedback.type === 'success' ? (
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                ) : (
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span>{profileFeedback.message}</span>
+              </div>
+            )}
+
+            {/* Editable Username */}
+            {isEditingUsername ? (
+              <form onSubmit={handleSaveUsername} className="space-y-3 pt-1 border-t border-[#26262b]/60">
+                <div className="text-left">
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Edit Username
+                  </label>
+                  <input
+                    type="text"
+                    value={editUsernameValue}
+                    onChange={(e) => setEditUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    maxLength={24}
+                    required
+                    placeholder="Enter new username"
+                    autoFocus
+                    className={`w-full h-10 px-3 rounded-xl border text-sm font-mono outline-none focus:border-[#c9b27c] ${
+                      isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
+                    }`}
+                  />
+                  <span className={`block text-[10px] mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Lowercase letters, numbers, and underscores only.
+                  </span>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingUsername(false);
+                      setEditUsernameValue(currentUser?.username || '');
+                      setProfileFeedback(null);
+                    }}
+                    className="flex-1 py-2 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingProfile || !editUsernameValue.trim()}
+                    className="flex-1 py-2 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Save</span>}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="pt-2 border-t border-[#26262b]/60">
+                <div className="flex items-center justify-center gap-2">
+                  <h3 className={`text-lg font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    {currentUser?.username || 'abdulshamil'}
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingUsername(true);
+                      setEditUsernameValue(currentUser?.username || '');
+                      setProfileFeedback(null);
+                    }}
+                    title="Edit username"
+                    className="p-1.5 rounded-lg text-[#8a8a93] hover:text-[#c9b27c] hover:bg-[#c9b27c]/10 transition-colors cursor-pointer"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+                <p className={`text-xs mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                  Multi-User Ledger Admin
+                </p>
+              </div>
+            )}
           </div>
         </div>
 

@@ -58,9 +58,9 @@ export default function BudgetPage() {
   };
 
   // Save changes to category
-  const handleSaveEdit = (catId) => {
+  const handleSaveEdit = async (catId) => {
     if (!editName.trim()) return;
-    updateCategory(catId, {
+    await updateCategory(catId, {
       name: editName.trim(),
       limit: Number(editLimit) || 1000,
     });
@@ -73,9 +73,9 @@ export default function BudgetPage() {
   };
 
   // Confirm delete
-  const confirmDeleteCategory = () => {
+  const confirmDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    deleteCategory(categoryToDelete.id);
+    await deleteCategory(categoryToDelete.id);
     if (editingCatId === categoryToDelete.id) {
       setEditingCatId(null);
     }
@@ -88,11 +88,11 @@ export default function BudgetPage() {
   };
 
   // Handle Add Category submission
-  const handleCreateCategory = (e) => {
+  const handleCreateCategory = async (e) => {
     e.preventDefault();
     if (!newCatName.trim()) return;
 
-    addCategory({
+    await addCategory({
       name: newCatName.trim(),
       limit: Number(newCatLimit) || 5000,
       color: newCatColor,

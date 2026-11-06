@@ -3,6 +3,7 @@ export const INITIAL_DATA = {
   users: [
     {
       username: 'abdulshamil',
+      avatar: '',
       password: '$2a$10$TfRnUe5aEGny84JO/WM6g.1pvT56w85s3sk2fEUawizXbHG8Uq5Nm',
       accessCodeEnabled: false,
       accessCodeHash: null,
@@ -12,6 +13,7 @@ export const INITIAL_DATA = {
     },
     {
       username: 'adilaka',
+      avatar: '',
       password: '$2a$10$7MvG7FH3vvfMH5xQrabd3eSL01uGDZp7Jfuk/ksx76Y083hUmItH6',
       accessCodeEnabled: false,
       accessCodeHash: null,

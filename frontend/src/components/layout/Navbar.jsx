@@ -14,7 +14,6 @@ export default function Navbar() {
   const {
     currentScreen,
     setCurrentScreen,
-    setIsAddExpenseModalOpen,
     currentUser,
     isLoggedIn,
     setIsLoggedIn,
@@ -92,7 +91,7 @@ export default function Navbar() {
           {isLoggedIn && (
             <button
               type="button"
-              onClick={() => setIsAddExpenseModalOpen(true)}
+              onClick={() => handleNavClick('add-expense')}
               className="px-3.5 py-2 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
@@ -117,8 +116,16 @@ export default function Navbar() {
               onClick={() => handleNavClick('profile')}
               className="flex items-center gap-2 pl-1 group cursor-pointer"
             >
-              <div className="w-8 h-8 rounded-full border border-[#26262b] bg-[#17171a] group-hover:border-[#c9b27c] text-[#c9b27c] font-bold text-xs flex items-center justify-center transition-colors shadow-sm">
-                {(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}
+              <div className="w-8 h-8 rounded-full border border-[#26262b] bg-[#17171a] group-hover:border-[#c9b27c] text-[#c9b27c] font-bold text-xs flex items-center justify-center transition-colors shadow-sm overflow-hidden">
+                {currentUser?.avatar ? (
+                  <img
+                    src={currentUser.avatar}
+                    alt={currentUser?.username || 'User'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
+                )}
               </div>
             </button>
           ) : (

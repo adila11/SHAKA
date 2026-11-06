@@ -10,6 +10,7 @@ import {
   getSessionInfo,
   logout,
   getMe,
+  updateProfile,
   forgotPassword,
   changePassword,
 } from '../controllers/authController.js';
@@ -26,6 +27,7 @@ router.post('/forgot-password', forgotPassword);
 
 // Protected session & access code management
 router.get('/me', protect, getMe);
+router.put('/profile', protect, updateProfile);
 router.get('/session-info', protect, getSessionInfo);
 router.post('/access-code/enable', protect, enableAccessCode);
 router.post('/access-code/change', protect, changeAccessCode);

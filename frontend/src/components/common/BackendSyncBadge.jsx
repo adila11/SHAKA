@@ -1,8 +1,21 @@
-import { CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, AlertCircle, Loader2, RefreshCw } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 
 export default function BackendSyncBadge({ className = '' }) {
-  const { isBackendConnected, isLoading } = useFinance();
+  const { isBackendConnected, isLoading, retryConnection } = useFinance();
+  const [isRetrying, setIsRetrying] = useState(false);
+
+  const handleRetry = async (e) => {
+    e.stopPropagation();
+    if (isRetrying) return;
+    setIsRetrying(true);
+    try {
+      await retryConnection();
+    } finally {
+      setIsRetrying(false);
+    }
+  };
 
   if (isLoading && isBackendConnected === null) {
     return (
@@ -28,13 +41,20 @@ export default function BackendSyncBadge({ className = '' }) {
   }
 
   return (
-    <span
-      className={`text-[11px] px-2.5 py-0.5 rounded-full bg-[#d97070]/15 text-[#d97070] font-semibold border border-[#d97070]/30 flex items-center gap-1.5 shadow-sm ${className}`}
+    <button
+      type="button"
+      onClick={handleRetry}
+      title="Click to retry connection to backend"
+      className={`text-[11px] px-2.5 py-0.5 rounded-full bg-[#d97070]/15 text-[#d97070] font-semibold border border-[#d97070]/30 hover:bg-[#d97070]/25 transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 ${className}`}
     >
-      <AlertCircle className="w-3 h-3 shrink-0 text-[#d97070]" />
+      {isRetrying ? (
+        <Loader2 className="w-3 h-3 animate-spin shrink-0 text-[#d97070]" />
+      ) : (
+        <AlertCircle className="w-3 h-3 shrink-0 text-[#d97070]" />
+      )}
       <span className="w-1.5 h-1.5 rounded-full bg-[#d97070]" />
-      <span>Backend Unable to Sync</span>
-    </span>
+      <span>{isRetrying ? 'Retrying...' : 'Backend Unable to Sync'}</span>
+      <RefreshCw className={`w-2.5 h-2.5 ml-0.5 ${isRetrying ? 'animate-spin' : ''}`} />
+    </button>
   );
 }
-

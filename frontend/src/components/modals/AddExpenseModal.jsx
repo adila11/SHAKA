@@ -1,35 +1,70 @@
 import { useState } from 'react';
-import { X, Check } from 'lucide-react';
+import { X, Check, Calendar } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
+
+const getTodayDate = () => new Date();
+const getYesterdayDate = () => {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d;
+};
+
+const toIsoDateString = (dateObj) => {
+  const d = new Date(dateObj);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const toFormattedDates = (dateObj) => {
+  const d = new Date(dateObj);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()];
+  const day = d.getDate();
+  const year = d.getFullYear();
+  return {
+    shortDate: `${month} ${day}`,
+    fullDate: `${month} ${day}, ${year}`,
+  };
+};
 
 export default function AddExpenseModal() {
   const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories, currentUser } = useFinance();
   const { isDark } = useTheme();
 
-  const [timing, setTiming] = useState('Spent now');
   const [amount, setAmount] = useState('750');
   const [selectedCategory, setSelectedCategory] = useState('Food');
-  const [date, setDate] = useState('Nov 22, 2026');
   const [description, setDescription] = useState('Coffee & Workspace with Sam');
+
+  // Date Selection: 'today' | 'yesterday' | 'calendar'
+  const [dateOption, setDateOption] = useState('today');
+  const [selectedDateObj, setSelectedDateObj] = useState(getTodayDate());
+  const [customCalendarDate, setCustomCalendarDate] = useState(toIsoDateString(getTodayDate()));
 
   if (!isAddExpenseModalOpen) return null;
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!amount || isNaN(amount) || Number(amount) <= 0) return;
 
-    addExpense({
+    const { shortDate, fullDate } = toFormattedDates(selectedDateObj);
+
+    const res = await addExpense({
       amount: Number(amount),
       category: selectedCategory,
       description: description || `${selectedCategory} expense`,
-      date: 'Nov 22',
-      time: 'Just now',
+      date: shortDate,
+      fullDate,
+      time: dateOption === 'today' ? 'Just now' : '12:00 PM',
       user: currentUser?.username || 'abdulshamil',
     });
 
-    setIsAddExpenseModalOpen(false);
-    setCurrentScreen('ledger');
+    if (res?.success) {
+      setIsAddExpenseModalOpen(false);
+      setCurrentScreen('ledger');
+    }
   };
 
   return (
@@ -77,42 +112,98 @@ export default function AddExpenseModal() {
           </button>
         </div>
 
-        {/* Segmented Timing Toggle */}
-        <div
-          className={`p-1 rounded-xl border flex items-center gap-1 mb-4 ${
-            isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
-          }`}
-        >
-          <button
-            type="button"
-            onClick={() => setTiming('Spent now')}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer ${
-              timing === 'Spent now'
-                ? isDark
-                  ? 'bg-[#202024] text-[#e8e8ea]'
-                  : 'bg-white text-[#18181b]'
-                : isDark
-                ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
-                : 'text-[#71717a] hover:text-[#18181b]'
+        {/* Date Selection: Today | Yesterday | Calendar */}
+        <div className="mb-4">
+          <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+            Date
+          </label>
+          <div
+            className={`p-1 rounded-xl border flex items-center gap-1 ${
+              isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
             }`}
           >
-            Spent now
-          </button>
-          <button
-            type="button"
-            onClick={() => setTiming('Planned upcoming')}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-              timing === 'Planned upcoming'
-                ? isDark
-                  ? 'bg-[#202024] text-[#e8e8ea]'
-                  : 'bg-white text-[#18181b]'
-                : isDark
-                ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
-                : 'text-[#71717a] hover:text-[#18181b]'
-            }`}
-          >
-            Planned upcoming
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDateOption('today');
+                const t = getTodayDate();
+                setSelectedDateObj(t);
+                setCustomCalendarDate(toIsoDateString(t));
+              }}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateOption === 'today'
+                  ? isDark
+                    ? 'bg-[#202024] text-[#c9b27c] shadow-sm'
+                    : 'bg-white text-[#c9b27c] shadow-sm'
+                  : isDark
+                  ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
+                  : 'text-[#71717a] hover:text-[#18181b]'
+              }`}
+            >
+              Today
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDateOption('yesterday');
+                const y = getYesterdayDate();
+                setSelectedDateObj(y);
+                setCustomCalendarDate(toIsoDateString(y));
+              }}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                dateOption === 'yesterday'
+                  ? isDark
+                    ? 'bg-[#202024] text-[#c9b27c] shadow-sm'
+                    : 'bg-white text-[#c9b27c] shadow-sm'
+                  : isDark
+                  ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
+                  : 'text-[#71717a] hover:text-[#18181b]'
+              }`}
+            >
+              Yesterday
+            </button>
+            <button
+              type="button"
+              onClick={() => setDateOption('calendar')}
+              className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                dateOption === 'calendar'
+                  ? isDark
+                    ? 'bg-[#202024] text-[#c9b27c] shadow-sm'
+                    : 'bg-white text-[#c9b27c] shadow-sm'
+                  : isDark
+                  ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
+                  : 'text-[#71717a] hover:text-[#18181b]'
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Calendar</span>
+            </button>
+          </div>
+
+          {/* If Calendar option is chosen, show the interactive calendar date picker */}
+          {dateOption === 'calendar' ? (
+            <div className="mt-2.5">
+              <input
+                type="date"
+                value={customCalendarDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setCustomCalendarDate(val);
+                  if (val) {
+                    const parts = val.split('-');
+                    setSelectedDateObj(new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2])));
+                  }
+                }}
+                className={`w-full h-11 px-3 rounded-xl border text-xs font-mono outline-none focus:border-[#c9b27c] transition-colors cursor-pointer ${
+                  isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
+                }`}
+              />
+            </div>
+          ) : (
+            <div className={`mt-2 text-right text-[11px] font-medium font-mono ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+              Selected: <span className="text-[#c9b27c]">{toFormattedDates(selectedDateObj).fullDate}</span>
+            </div>
+          )}
         </div>
 
         {/* Big Number Input */}
@@ -174,35 +265,20 @@ export default function AddExpenseModal() {
           </div>
         </div>
 
-        {/* Date & Description */}
-        <div className="space-y-3 mb-5">
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Date
-            </label>
-            <input
-              type="text"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className={`w-full h-11 px-3 rounded-xl border text-xs outline-none focus:border-[#c9b27c] transition-colors ${
-                isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
-              }`}
-            />
-          </div>
-          <div>
-            <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Description / Notes
-            </label>
-            <input
-              type="text"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="e.g. Dinner, taxi split, grocery store"
-              className={`w-full h-11 px-3 rounded-xl border text-xs outline-none focus:border-[#c9b27c] transition-colors ${
-                isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
-              }`}
-            />
-          </div>
+        {/* Description / Notes */}
+        <div className="mb-5">
+          <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+            Description / Notes
+          </label>
+          <input
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="e.g. Dinner, taxi split, grocery store"
+            className={`w-full h-11 px-3 rounded-xl border text-xs outline-none focus:border-[#c9b27c] transition-colors ${
+              isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
+            }`}
+          />
         </div>
 
         {/* Submit Button */}
@@ -217,4 +293,3 @@ export default function AddExpenseModal() {
     </div>
   );
 }
-
