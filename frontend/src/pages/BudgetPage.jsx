@@ -12,6 +12,7 @@ import {
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
+import BackendSyncBadge from '../components/common/BackendSyncBadge';
 
 const COLOR_PALETTE = [
   { name: 'Gold', hex: '#c9b27c' },
@@ -112,6 +113,9 @@ export default function BudgetPage() {
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
+            <div className="mb-1">
+              <BackendSyncBadge />
+            </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Budget Allocation
             </h2>

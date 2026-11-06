@@ -33,6 +33,11 @@ async function request(endpoint, options = {}) {
 }
 
 export const api = {
+  // Health Check
+  health: {
+    check: () => request('/health'),
+  },
+
   // Authentication
   auth: {
     login: (credentials) =>

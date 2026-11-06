@@ -1,15 +1,16 @@
-import { ArrowRight, Plus, Calendar, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Plus, Calendar, ShieldCheck } from 'lucide-react';
 import MonthlyLimitWidget from '../components/widgets/MonthlyLimitWidget';
 import DonutSpendWidget from '../components/widgets/DonutSpendWidget';
 import StatCardsWidget from '../components/widgets/StatCardsWidget';
 import ProjectedSpendWidget from '../components/widgets/ProjectedSpendWidget';
 import CategoryBadge from '../components/common/CategoryBadge';
+import BackendSyncBadge from '../components/common/BackendSyncBadge';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function DashboardPage() {
-  const { currentUser, transactions, totalSpent, monthlyLimit, setCurrentScreen, setIsAddExpenseModalOpen, isLoading } = useFinance();
+  const { currentUser, transactions, totalSpent, monthlyLimit, setCurrentScreen, setIsAddExpenseModalOpen } = useFinance();
   const { isDark } = useTheme();
 
   const recentTransactions = transactions.slice(0, 5);
@@ -32,10 +33,7 @@ export default function DashboardPage() {
                 November 2026
               </span>
               <span className="w-1 h-1 rounded-full bg-[#8a8a93]" />
-              <span className="text-[11px] px-2 py-0.5 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] font-semibold border border-[#8fb39a]/30 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" />
-                {isLoading ? 'Syncing with backend...' : 'Live Synced'}
-              </span>
+              <BackendSyncBadge />
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Welcome back, {currentUser?.name ? currentUser.name.split(' ')[0] : 'Member'}

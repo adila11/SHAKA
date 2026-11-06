@@ -20,6 +20,7 @@ export function FinanceProvider({ children }) {
   const [householdBalances, setHouseholdBalances] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
+  const [isBackendConnected, setIsBackendConnected] = useState(null);
   const [error, setError] = useState(null);
 
   // Re-fetch all data from backend API
@@ -35,6 +36,11 @@ export function FinanceProvider({ children }) {
         api.household.getMembers(),
         api.household.getBalances(),
       ]);
+
+      const anySuccess = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].some(
+        r => r.status === 'fulfilled' && r.value?.success
+      );
+      setIsBackendConnected(anySuccess);
 
       if (txRes.status === 'fulfilled' && txRes.value.success) {
         setTransactions(txRes.value.data || []);
@@ -64,6 +70,7 @@ export function FinanceProvider({ children }) {
     } catch (err) {
       console.warn('Failed to fetch from backend:', err);
       setError(err.message);
+      setIsBackendConnected(false);
     } finally {
       setIsLoading(false);
     }
@@ -83,6 +90,11 @@ export function FinanceProvider({ children }) {
         ]);
 
         if (!ignore) {
+          const anySuccess = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].some(
+            r => r.status === 'fulfilled' && r.value?.success
+          );
+          setIsBackendConnected(anySuccess);
+
           if (txRes.status === 'fulfilled' && txRes.value.success) {
             setTransactions(txRes.value.data || []);
           }
@@ -108,6 +120,7 @@ export function FinanceProvider({ children }) {
       } catch (err) {
         if (!ignore) {
           setError(err.message);
+          setIsBackendConnected(false);
           setIsLoading(false);
         }
       }
@@ -116,6 +129,24 @@ export function FinanceProvider({ children }) {
     return () => {
       ignore = true;
     };
+  }, []);
+
+  // Periodic health check heartbeat to ensure connection status is always real-time
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const res = await api.health.check();
+        if (res && res.status === 'healthy') {
+          setIsBackendConnected(true);
+        } else {
+          setIsBackendConnected(false);
+        }
+      } catch {
+        setIsBackendConnected(false);
+      }
+    }, 8000);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Derived financial metrics computed from real data
@@ -172,6 +203,7 @@ export function FinanceProvider({ children }) {
       });
 
       if (res.success && res.data) {
+        setIsBackendConnected(true);
         setTransactions(prev => [res.data, ...prev]);
 
         // Optimistically update budget categories
@@ -195,6 +227,7 @@ export function FinanceProvider({ children }) {
       }
     } catch (err) {
       console.error('Failed to add expense:', err);
+      setIsBackendConnected(false);
     } finally {
       setIsAddExpenseModalOpen(false);
     }
@@ -218,6 +251,7 @@ export function FinanceProvider({ children }) {
       });
 
       if (res.success && res.data) {
+        setIsBackendConnected(true);
         setBudgetCategories(prev => [...prev, res.data]);
         setAvailableCategories(prev => {
           if (prev.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) return prev;
@@ -226,6 +260,7 @@ export function FinanceProvider({ children }) {
       }
     } catch (err) {
       console.error('Failed to add category:', err);
+      setIsBackendConnected(false);
     }
   };
 
@@ -234,12 +269,14 @@ export function FinanceProvider({ children }) {
     try {
       const res = await api.budget.updateCategory(categoryId, { name, limit, color });
       if (res.success && res.data) {
+        setIsBackendConnected(true);
         setBudgetCategories(prev =>
           prev.map(cat => (cat.id === categoryId ? res.data : cat))
         );
       }
     } catch (err) {
       console.error('Failed to update category:', err);
+      setIsBackendConnected(false);
     }
   };
 
@@ -248,6 +285,7 @@ export function FinanceProvider({ children }) {
     try {
       const res = await api.budget.deleteCategory(categoryId);
       if (res.success) {
+        setIsBackendConnected(true);
         const catToDelete = budgetCategories.find(c => c.id === categoryId);
         setBudgetCategories(prev => prev.filter(cat => cat.id !== categoryId));
         if (catToDelete) {
@@ -258,6 +296,7 @@ export function FinanceProvider({ children }) {
       }
     } catch (err) {
       console.error('Failed to delete category:', err);
+      setIsBackendConnected(false);
     }
   };
 
@@ -269,10 +308,12 @@ export function FinanceProvider({ children }) {
     try {
       const res = await api.budget.updateMonthlyLimit(num);
       if (res.success) {
+        setIsBackendConnected(true);
         setMonthlyLimitState(num);
       }
     } catch (err) {
       console.error('Failed to update monthly limit:', err);
+      setIsBackendConnected(false);
     }
   };
 
@@ -281,6 +322,7 @@ export function FinanceProvider({ children }) {
     try {
       const res = await api.auth.login({ username, password });
       if (res.success) {
+        setIsBackendConnected(true);
         if (res.token) {
           localStorage.setItem('shaka_token', res.token);
         }
@@ -294,6 +336,7 @@ export function FinanceProvider({ children }) {
       }
       return { success: false, message: res.message || 'Login failed' };
     } catch (err) {
+      setIsBackendConnected(false);
       return { success: false, message: err.message || 'Login failed' };
     }
   };
@@ -347,6 +390,7 @@ export function FinanceProvider({ children }) {
         updateCategory,
         deleteCategory,
         isLoading,
+        isBackendConnected,
         error,
         refreshData,
       }}
