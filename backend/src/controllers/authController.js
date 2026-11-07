@@ -112,7 +112,8 @@ export const login = async (req, res, next) => {
       accessCodeEnabled: Boolean(user.accessCodeEnabled),
       user: {
         username: user.username,
-        avatar: user.avatar || '',
+        profileImage: user.profileImage || user.avatar || 'profile1',
+        avatar: user.profileImage || user.avatar || 'profile1',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -667,7 +668,8 @@ export const getMe = async (req, res, next) => {
       success: true,
       user: {
         username: user.username,
-        avatar: user.avatar || '',
+        profileImage: user.profileImage || user.avatar || 'profile1',
+        avatar: user.profileImage || user.avatar || 'profile1',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -712,17 +714,29 @@ export const changePassword = async (req, res, next) => {
   }
 };
 
-// 11. Update Profile (Username & Avatar)
+// 11. Update Profile (Username & Profile Picture)
 export const updateProfile = async (req, res, next) => {
   try {
-    const { username: newUsername, avatar } = req.body;
+    const { username: newUsername, profileImage, avatar } = req.body;
     const currentUsername = req.user.username;
 
-    if (!newUsername && avatar === undefined) {
+    const selectedImage = profileImage !== undefined ? profileImage : avatar;
+
+    if (!newUsername && selectedImage === undefined) {
       return res.status(400).json({
         success: false,
         message: 'No profile updates provided',
       });
+    }
+
+    // Strictly validate predefined profile picture identifier: only "profile1" or "profile2"
+    if (selectedImage !== undefined) {
+      if (selectedImage !== 'profile1' && selectedImage !== 'profile2') {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid profile picture. Only "profile1" and "profile2" are allowed.',
+        });
+      }
     }
 
     const trimmedUsername = newUsername ? String(newUsername).trim() : currentUsername;
@@ -747,7 +761,8 @@ export const updateProfile = async (req, res, next) => {
 
     const updatedUser = await dbStore.users.updateProfile(currentUsername, {
       newUsername: trimmedUsername,
-      avatar,
+      profileImage: selectedImage,
+      avatar: selectedImage,
     });
 
     // Re-issue JWT token if username changed
@@ -771,7 +786,8 @@ export const updateProfile = async (req, res, next) => {
       token,
       user: {
         username: updatedUser.username,
-        avatar: updatedUser.avatar || '',
+        profileImage: updatedUser.profileImage || updatedUser.avatar || 'profile1',
+        avatar: updatedUser.profileImage || updatedUser.avatar || 'profile1',
         accessCodeEnabled: Boolean(updatedUser.accessCodeEnabled),
         createdAt: updatedUser.createdAt,
         updatedAt: updatedUser.updatedAt,

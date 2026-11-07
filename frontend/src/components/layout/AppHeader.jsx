@@ -1,5 +1,6 @@
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
+import { getProfileImageUrl } from '../../data/financeData';
 
 export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfileClick }) {
   const { currentUser, navigateTo } = useFinance();
@@ -53,11 +54,11 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
               : 'bg-white border-[#e5e3dc] text-[#c9b27c] group-hover:border-[#c9b27c]'
           }`}
         >
-          {currentUser?.avatar ? (
-            <img src={currentUser.avatar} alt={currentUser.username} className="w-full h-full object-cover" />
-          ) : (
-            (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
-          )}
+          <img
+            src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
+            alt={currentUser?.username || 'User'}
+            className="w-full h-full object-cover"
+          />
         </div>
       </button>
     </div>

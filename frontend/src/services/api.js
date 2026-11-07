@@ -302,6 +302,11 @@ export const api = {
       return request(`/transactions${query ? `?${query}` : ''}`);
     },
     getById: (id) => request(`/transactions/${id}`),
+    authorizeExpense: ({ amount, credential, credentialType, user }) =>
+      request('/transactions/authorize', {
+        method: 'POST',
+        body: JSON.stringify({ amount, credential, credentialType, user }),
+      }),
     create: (expense) =>
       request('/transactions', {
         method: 'POST',

@@ -5,9 +5,12 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  authorizeExpense,
 } from '../controllers/transactionController.js';
 
 const router = Router();
+
+router.post('/authorize', authorizeExpense);
 
 router.route('/')
   .get(getTransactions)

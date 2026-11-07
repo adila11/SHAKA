@@ -13,7 +13,11 @@ const memState = {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })),
-  transactions: JSON.parse(JSON.stringify(INITIAL_DATA.transactions)),
+  transactions: JSON.parse(JSON.stringify(INITIAL_DATA.transactions)).map(t => ({
+    ...t,
+    createdAt: t.createdAt || new Date(`${t.fullDate || t.date + ', 2026'} ${t.time || '12:00 PM'}`).toISOString(),
+    updatedAt: t.updatedAt || new Date(`${t.fullDate || t.date + ', 2026'} ${t.time || '12:00 PM'}`).toISOString(),
+  })),
   budgetCategories: JSON.parse(JSON.stringify(INITIAL_DATA.budgetCategories)),
   setting: {
     key: 'global',
@@ -29,9 +33,18 @@ export const dbStore = {
   users: {
     find: async () => {
       if (isDbConnected()) {
-        return User.find().select('username avatar accessCodeEnabled createdAt updatedAt').lean();
+        const users = await User.find().select('username avatar profileImage accessCodeEnabled createdAt updatedAt').lean();
+        return users.map(u => ({
+          ...u,
+          avatar: u.profileImage || u.avatar || 'profile1',
+          profileImage: u.profileImage || u.avatar || 'profile1',
+        }));
       }
-      return memState.users.map(({ password, accessCodeHash, sessions, ...u }) => u);
+      return memState.users.map(({ password, accessCodeHash, sessions, ...u }) => ({
+        ...u,
+        avatar: u.profileImage || u.avatar || 'profile1',
+        profileImage: u.profileImage || u.avatar || 'profile1',
+      }));
     },
     findByUsername: async (username) => {
       const reg = new RegExp(`^${username.trim()}$`, 'i');
@@ -48,10 +61,14 @@ export const dbStore = {
       const match = memState.users.find(u => u.sessions?.some(s => s.sessionId === sessionId));
       return match ? { ...match, toObject: () => ({ ...match }) } : null;
     },
-    updateProfile: async (currentUsername, { newUsername, avatar }) => {
+    updateProfile: async (currentUsername, { newUsername, profileImage, avatar }) => {
       const updates = {};
       if (newUsername) updates.username = newUsername;
-      if (avatar !== undefined) updates.avatar = avatar;
+      const img = profileImage !== undefined ? profileImage : avatar;
+      if (img !== undefined) {
+        updates.profileImage = img;
+        updates.avatar = img;
+      }
       updates.updatedAt = new Date().toISOString();
 
       if (isDbConnected()) {
@@ -70,7 +87,10 @@ export const dbStore = {
       const memUser = memState.users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase());
       if (memUser) {
         if (newUsername) memUser.username = newUsername;
-        if (avatar !== undefined) memUser.avatar = avatar;
+        if (img !== undefined) {
+          memUser.profileImage = img;
+          memUser.avatar = img;
+        }
         memUser.updatedAt = updates.updatedAt;
       }
 
@@ -82,7 +102,7 @@ export const dbStore = {
         });
       }
 
-      return memUser || { username: newUsername || currentUsername, avatar };
+      return memUser || { username: newUsername || currentUsername, profileImage: img || 'profile1', avatar: img || 'profile1' };
     },
     updatePassword: async (username, newHash) => {
       if (isDbConnected()) {
@@ -267,6 +287,20 @@ export const dbStore = {
             t.user.toLowerCase().includes(q)
         );
       }
+
+      // Ensure newest expenses always appear first
+      list.sort((a, b) => {
+        if (a.time === 'Just now' && b.time !== 'Just now') return -1;
+        if (b.time === 'Just now' && a.time !== 'Just now') return 1;
+        const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+        const dateA = new Date(a.fullDate || a.date).getTime();
+        const dateB = new Date(b.fullDate || b.date).getTime();
+        if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) return dateB - dateA;
+        return 0;
+      });
+
       return list;
     },
     findById: async (id) => {

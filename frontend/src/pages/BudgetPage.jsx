@@ -41,6 +41,7 @@ export default function BudgetPage() {
   const [newCatName, setNewCatName] = useState('');
   const [newCatLimit, setNewCatLimit] = useState('5000');
   const [newCatColor, setNewCatColor] = useState('#c9b27c');
+  const [addCatError, setAddCatError] = useState('');
 
   // State for editing a specific category
   const [editingCatId, setEditingCatId] = useState(null);
@@ -87,14 +88,24 @@ export default function BudgetPage() {
     setCategoryToDelete(cat);
   };
 
-  // Handle Add Category submission
+  // Handle Add Category submission with JS validation
   const handleCreateCategory = async (e) => {
     e.preventDefault();
-    if (!newCatName.trim()) return;
+    const trimmed = newCatName.trim();
+    if (!trimmed) {
+      setAddCatError('Category name is required.');
+      return;
+    }
+    const numLimit = Number(newCatLimit);
+    if (isNaN(numLimit) || numLimit <= 0) {
+      setAddCatError('Monthly limit must be a positive number greater than 0.');
+      return;
+    }
 
+    setAddCatError('');
     await addCategory({
-      name: newCatName.trim(),
-      limit: Number(newCatLimit) || 5000,
+      name: trimmed,
+      limit: numLimit,
       color: newCatColor,
     });
 
@@ -135,31 +146,40 @@ export default function BudgetPage() {
 
       {/* Total Monthly Budget Overview Card */}
       <div
-        className={`p-6 rounded-2xl border transition-colors shadow-sm ${
+        className={`p-4 sm:p-6 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden ${
           isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
         }`}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-          <div>
-            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 min-w-0">
+          <div className="min-w-0">
+            <span className={`text-xs font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Total Monthly Budget
             </span>
-            <div className="flex items-baseline gap-3 mt-1">
-              <span className={`text-3xl font-black font-mono tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                {isLoading ? <Skeleton className="w-28 h-8 my-0.5 inline-block" /> : formatCurrency(totalSpent)}
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-3 mt-1 min-w-0">
+              <span
+                className={`text-2xl sm:text-3xl font-black font-mono tracking-tight truncate max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}
+                title={formatCurrency(totalSpent)}
+              >
+                {isLoading ? <Skeleton className="w-24 sm:w-28 h-7 sm:h-8 my-0.5 inline-block" /> : formatCurrency(totalSpent)}
               </span>
-              <span className={`text-sm font-medium ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+              <span
+                className={`text-xs sm:text-sm font-medium truncate max-w-full ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}
+                title={`spent of ${formatCurrency(monthlyLimit)}`}
+              >
                 spent of {isLoading ? <Skeleton className="w-16 h-4 inline-block" /> : formatCurrency(monthlyLimit)}
               </span>
             </div>
           </div>
 
-          <div className="text-left sm:text-right">
-            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+          <div className="text-left sm:text-right min-w-0 shrink-0">
+            <span className={`text-xs font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Surplus Remaining
             </span>
-            <div className="text-2xl font-black font-mono text-[#8fb39a] mt-1">
-              {isLoading ? <Skeleton className="w-24 h-7 my-0.5 ml-auto" /> : formatCurrency(remainingLimit)}
+            <div
+              className="text-xl sm:text-2xl font-black font-mono text-[#8fb39a] mt-1 truncate max-w-full"
+              title={formatCurrency(remainingLimit)}
+            >
+              {isLoading ? <Skeleton className="w-20 sm:w-24 h-6 sm:h-7 my-0.5 sm:ml-auto" /> : formatCurrency(remainingLimit)}
             </div>
           </div>
         </div>
@@ -175,11 +195,11 @@ export default function BudgetPage() {
             />
           )}
         </div>
-        <div className="flex justify-between text-xs mt-2 font-medium">
-          <span className="text-[#c9b27c]">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-xs mt-2 font-medium min-w-0">
+          <span className="text-[#c9b27c] truncate max-w-full">
             {isLoading ? <Skeleton className="w-32 h-3" /> : `${monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of total cap utilized`}
           </span>
-          <span className={isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}>
+          <span className={`shrink-0 text-right ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             8 days remaining in November
           </span>
         </div>
@@ -187,26 +207,26 @@ export default function BudgetPage() {
 
       {/* Grid of Categories (Responsive 3 cols on desktop, 2 on tablet, 1 on mobile) */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 min-w-0 max-w-full">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className={`p-5 rounded-2xl border transition-colors shadow-sm space-y-4 ${
+              className={`p-4 sm:p-5 rounded-2xl border transition-colors shadow-sm space-y-4 min-w-0 max-w-full overflow-hidden ${
                 isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
               }`}
             >
-              <div className="flex justify-between items-start">
-                <div className="space-y-1.5">
+              <div className="flex justify-between items-start min-w-0">
+                <div className="space-y-1.5 min-w-0">
                   <Skeleton className="w-28 h-4 rounded" />
                   <Skeleton className="w-20 h-3 rounded" />
                 </div>
-                <Skeleton className="w-16 h-5 rounded-full" />
+                <Skeleton className="w-16 h-5 rounded-full shrink-0" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <Skeleton className="w-32 h-6 rounded" />
                 <Skeleton className="w-full h-2 rounded-full" />
               </div>
-              <div className="flex justify-between">
+              <div className="flex justify-between min-w-0">
                 <Skeleton className="w-16 h-3 rounded" />
                 <Skeleton className="w-16 h-3 rounded" />
               </div>
@@ -215,7 +235,7 @@ export default function BudgetPage() {
         </div>
       ) : budgetCategories.length === 0 ? (
         <div
-          className={`p-10 rounded-2xl border text-center transition-colors shadow-sm ${
+          className={`p-10 rounded-2xl border text-center transition-colors shadow-sm min-w-0 max-w-full ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
@@ -228,14 +248,14 @@ export default function BudgetPage() {
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="px-4 py-2 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-sm"
+            className="px-4 py-2 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add Category</span>
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 min-w-0 max-w-full">
           {budgetCategories.map((cat) => {
           const isEditingThis = editingCatId === cat.id;
           const percent = cat.limit > 0 ? Math.round((cat.spent / cat.limit) * 100) : 0;
@@ -244,14 +264,14 @@ export default function BudgetPage() {
           return (
             <div
               key={cat.id}
-              className={`p-5 rounded-2xl border transition-colors shadow-sm flex flex-col justify-between ${
+              className={`p-4 sm:p-5 rounded-2xl border transition-colors shadow-sm flex flex-col justify-between min-w-0 max-w-full overflow-hidden ${
                 isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
               }`}
             >
-              <div>
+              <div className="min-w-0">
                 {/* Header with Title, Status & Actions */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex-1 min-w-0 pr-2">
+                <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
+                  <div className="flex-1 min-w-0 pr-1">
                     {isEditingThis ? (
                       <div className="space-y-1">
                         <label className="text-[10px] text-[#8a8a93] uppercase tracking-wider block font-medium">
@@ -272,33 +292,33 @@ export default function BudgetPage() {
                       </div>
                     ) : (
                       <>
-                        <h3 className={`text-sm font-bold tracking-tight truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                        <h3 className={`text-sm font-bold tracking-tight truncate break-words ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
                           {cat.name}
                         </h3>
-                        <p className={`text-[11px] mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                        <p className={`text-[11px] mt-0.5 truncate ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
                           {cat.category} allocation
                         </p>
                       </>
                     )}
                   </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0 min-w-0">
                     {!isEditingThis && (
                       <>
                         {cat.status === 'Limit reached' ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d97070]/20 text-[#d97070] font-bold border border-[#d97070]/30 flex items-center gap-1">
+                          <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#d97070]/20 text-[#d97070] font-bold border border-[#d97070]/30 flex items-center gap-1 shrink-0">
                             <ShieldAlert className="w-3 h-3" />
-                            Limit reached
+                            <span className="truncate">Limit reached</span>
                           </span>
                         ) : cat.status === 'Near limit' ? (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d4a359]/20 text-[#d4a359] font-bold border border-[#d4a359]/30 flex items-center gap-1">
+                          <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#d4a359]/20 text-[#d4a359] font-bold border border-[#d4a359]/30 flex items-center gap-1 shrink-0">
                             <AlertTriangle className="w-3 h-3" />
-                            Near limit
+                            <span className="truncate">Near limit</span>
                           </span>
                         ) : (
-                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] font-bold border border-[#8fb39a]/30 flex items-center gap-1">
+                          <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] font-bold border border-[#8fb39a]/30 flex items-center gap-1 shrink-0">
                             <CheckCircle2 className="w-3 h-3" />
-                            Healthy
+                            <span className="truncate">Healthy</span>
                           </span>
                         )}
 
@@ -307,7 +327,7 @@ export default function BudgetPage() {
                           type="button"
                           onClick={() => handleStartEdit(cat)}
                           title="Edit Category Name & Limit"
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
                             isDark
                               ? 'bg-[#0e0e10] border-[#26262b] text-[#8a8a93] hover:text-[#c9b27c] hover:border-[#c9b27c]'
                               : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#71717a] hover:text-[#c9b27c] hover:border-[#c9b27c]'
@@ -321,7 +341,7 @@ export default function BudgetPage() {
                           type="button"
                           onClick={() => handleDeleteCategory(cat)}
                           title="Delete Category"
-                          className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#d97070] hover:border-[#d97070]/40 transition-colors cursor-pointer"
+                          className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#d97070] hover:border-[#d97070]/40 transition-colors cursor-pointer shrink-0"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -331,23 +351,24 @@ export default function BudgetPage() {
                 </div>
 
                 {/* Amounts Readout */}
-                <div className="flex items-baseline justify-between mb-2">
+                <div className="flex items-baseline justify-between gap-2 mb-2 min-w-0">
                   <span
-                    className={`text-xl font-black font-mono ${
+                    className={`text-base sm:text-lg lg:text-xl font-black font-mono truncate min-w-0 max-w-[55%] ${
                       percent > 100 ? 'text-[#d97070]' : isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'
                     }`}
+                    title={formatCurrency(cat.spent)}
                   >
                     {formatCurrency(cat.spent)}
                   </span>
-                  <div className="text-right">
+                  <div className="text-right shrink-0 min-w-0 max-w-[45%]">
                     {isEditingThis ? (
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 justify-end">
                         <span className="text-xs text-[#8a8a93]">Limit: ₹</span>
                         <input
                           type="number"
                           value={editLimit}
                           onChange={(e) => setEditLimit(e.target.value)}
-                          className={`w-24 px-2 py-1 text-xs font-mono font-bold rounded-lg border outline-none focus:border-[#c9b27c] ${
+                          className={`w-20 px-1.5 py-1 text-xs font-mono font-bold rounded-lg border outline-none focus:border-[#c9b27c] ${
                             isDark
                               ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
                               : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
@@ -355,7 +376,10 @@ export default function BudgetPage() {
                         />
                       </div>
                     ) : (
-                      <span className={`text-xs font-mono ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                      <span
+                        className={`text-xs font-mono truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}
+                        title={`of ${formatCurrency(cat.limit)}`}
+                      >
                         of {formatCurrency(cat.limit)}
                       </span>
                     )}
@@ -373,11 +397,14 @@ export default function BudgetPage() {
                   />
                 </div>
 
-                <div className="flex justify-between text-xs mt-2">
-                  <span className={`font-semibold ${percent > 100 ? 'text-[#d97070]' : 'text-[#8a8a93]'}`}>
+                <div className="flex items-center justify-between gap-1 text-[11px] sm:text-xs mt-2 min-w-0">
+                  <span className={`font-semibold shrink-0 ${percent > 100 ? 'text-[#d97070]' : 'text-[#8a8a93]'}`}>
                     {percent}% used
                   </span>
-                  <span className={percent > 100 ? 'text-[#d97070] font-medium' : 'text-[#8fb39a] font-medium'}>
+                  <span
+                    className={`font-medium truncate text-right min-w-0 ${percent > 100 ? 'text-[#d97070]' : 'text-[#8fb39a]'}`}
+                    title={percent > 100 ? `${formatCurrency(cat.spent - cat.limit)} over` : `${formatCurrency(remaining)} left`}
+                  >
                     {percent > 100 ? `${formatCurrency(cat.spent - cat.limit)} over` : `${formatCurrency(remaining)} left`}
                   </span>
                 </div>
@@ -429,25 +456,32 @@ export default function BudgetPage() {
           />
 
           <div
-            className={`relative z-10 w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+            className={`relative z-10 w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
             }`}
           >
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="text-lg font-bold tracking-tight">Add New Category</h3>
+            <div className="flex items-center justify-between mb-4 min-w-0">
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold tracking-tight truncate">Add New Category</h3>
                 <p className="text-xs text-[#8a8a93]">Define a new category and monthly ceiling limit</p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#e8e8ea] cursor-pointer"
+                className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#e8e8ea] cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <form onSubmit={handleCreateCategory} className="space-y-4">
+            {addCatError && (
+              <div className="mb-4 p-2.5 rounded-xl bg-[#d97070]/10 border border-[#d97070]/30 text-[#d97070] text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{addCatError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateCategory} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider mb-1.5 text-[#8a8a93]">
                   Category Name
@@ -455,7 +489,10 @@ export default function BudgetPage() {
                 <input
                   type="text"
                   value={newCatName}
-                  onChange={(e) => setNewCatName(e.target.value)}
+                  onChange={(e) => {
+                    setNewCatName(e.target.value);
+                    if (addCatError) setAddCatError('');
+                  }}
                   placeholder="e.g. Entertainment, Fitness, Education"
                   className={`w-full h-11 px-3.5 rounded-xl border text-sm outline-none focus:border-[#c9b27c] transition-colors ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
@@ -473,7 +510,10 @@ export default function BudgetPage() {
                   <input
                     type="number"
                     value={newCatLimit}
-                    onChange={(e) => setNewCatLimit(e.target.value)}
+                    onChange={(e) => {
+                      setNewCatLimit(e.target.value);
+                      if (addCatError) setAddCatError('');
+                    }}
                     placeholder="5000"
                     className={`w-full h-11 pl-8 pr-4 rounded-xl border text-sm font-mono outline-none focus:border-[#c9b27c] transition-colors ${
                       isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
@@ -529,16 +569,16 @@ export default function BudgetPage() {
       {categoryToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
           <div
-            className={`w-full max-w-sm rounded-2xl border p-6 shadow-2xl transition-all ${
+            className={`w-full max-w-sm rounded-2xl border p-6 shadow-2xl transition-all min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
             }`}
           >
-            <div className="flex items-center gap-3 mb-3">
+            <div className="flex items-center gap-3 mb-3 min-w-0">
               <div className="w-10 h-10 rounded-xl bg-[#d97070]/15 border border-[#d97070]/30 flex items-center justify-center text-[#d97070] shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
-              <div>
-                <h3 className={`text-base font-bold ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+              <div className="min-w-0">
+                <h3 className={`text-base font-bold truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
                   Delete Category
                 </h3>
                 <p className="text-xs text-[#8a8a93]">This action cannot be undone.</p>
@@ -546,7 +586,7 @@ export default function BudgetPage() {
             </div>
 
             <p className={`text-xs my-4 leading-relaxed ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Are you sure you want to delete <span className="font-semibold text-[#c9b27c]">"{categoryToDelete.name}"</span>? Its allocated budget limit will be removed from your monthly ceiling.
+              Are you sure you want to delete <span className="font-semibold text-[#c9b27c] break-all">"{categoryToDelete.name}"</span>? Its allocated budget limit will be removed from your monthly ceiling.
             </p>
 
             <div className="flex items-center justify-end gap-2.5 pt-2">

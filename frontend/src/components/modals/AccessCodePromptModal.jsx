@@ -16,7 +16,15 @@ export default function AccessCodePromptModal() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!code.trim()) return;
+    const trimmed = code.trim();
+    if (!trimmed) {
+      setErrorMsg('Please enter your 4-digit access code.');
+      return;
+    }
+    if (!/^\d{4}$/.test(trimmed)) {
+      setErrorMsg('Access code must be exactly 4 digits.');
+      return;
+    }
 
     setErrorMsg('');
     setIsSubmitting(true);
@@ -43,7 +51,7 @@ export default function AccessCodePromptModal() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 transition-all">
       <div
-        className={`w-full max-w-md rounded-3xl p-6 sm:p-7 border shadow-2xl transition-colors ${
+        className={`w-full max-w-md rounded-3xl p-6 sm:p-7 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
           isDark
             ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
             : 'bg-white border-[#e5e3dc] text-[#18181b]'
@@ -68,7 +76,7 @@ export default function AccessCodePromptModal() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Enter 4-Digit Access Code
@@ -77,12 +85,13 @@ export default function AccessCodePromptModal() {
               <input
                 type={showCode ? 'text' : 'password'}
                 value={code}
-                onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onChange={(e) => {
+                  setCode(e.target.value.replace(/\D/g, '').slice(0, 4));
+                  if (errorMsg) setErrorMsg('');
+                }}
                 maxLength={4}
                 inputMode="numeric"
-                pattern="[0-9]*"
                 autoFocus
-                required
                 placeholder="••••"
                 className={`w-full h-12 px-4 text-center tracking-[0.4em] text-xl font-mono rounded-xl border outline-none focus:border-[#c9b27c] transition-colors ${
                   isDark
@@ -104,7 +113,7 @@ export default function AccessCodePromptModal() {
 
           <button
             type="submit"
-            disabled={isSubmitting || !code.trim()}
+            disabled={isSubmitting}
             className="w-full h-12 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-sm shadow-md shadow-[#c9b27c]/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {isSubmitting ? (

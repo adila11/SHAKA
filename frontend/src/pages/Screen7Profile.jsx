@@ -2,6 +2,7 @@ import { ShieldCheck, UserPen, KeyRound, Palette, SunMedium, Moon, LogOut, Chevr
 import BottomNavigation from '../components/layout/BottomNavigation';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
+import { getProfileImageUrl } from '../data/financeData';
 
 export default function Screen7Profile({ customTheme = null, onNavigate }) {
   const { currentUser, navigateTo, setIsLoggedIn } = useFinance();
@@ -32,11 +33,11 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
           }`}
         >
           <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-xl font-bold flex items-center justify-center mx-auto mb-3 shadow-md shadow-[#c9b27c]/10 overflow-hidden">
-            {currentUser?.avatar ? (
-              <img src={currentUser.avatar} alt={currentUser?.username || 'Profile'} className="w-full h-full object-cover" />
-            ) : (
-              (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
-            )}
+            <img
+              src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
+              alt={currentUser?.username || 'Profile'}
+              className="w-full h-full object-cover"
+            />
           </div>
           <h3 className={`text-base font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
             {currentUser?.username || 'abdulshamil'}
@@ -61,6 +62,7 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
           {/* Edit Profile */}
           <button
             type="button"
+            onClick={() => handleNav('profile')}
             className={`w-full px-4 py-3.5 flex items-center justify-between text-left transition-colors cursor-pointer ${
               isDark ? 'hover:bg-neutral-800/40' : 'hover:bg-neutral-50'
             }`}

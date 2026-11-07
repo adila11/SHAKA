@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
+import { getProfileImageUrl } from '../../data/financeData';
 
 export default function Navbar() {
   const {
@@ -117,15 +118,11 @@ export default function Navbar() {
               className="flex items-center gap-2 pl-1 group cursor-pointer"
             >
               <div className="w-8 h-8 rounded-full border border-[#26262b] bg-[#17171a] group-hover:border-[#c9b27c] text-[#c9b27c] font-bold text-xs flex items-center justify-center transition-colors shadow-sm overflow-hidden">
-                {currentUser?.avatar ? (
-                  <img
-                    src={currentUser.avatar}
-                    alt={currentUser?.username || 'User'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  (currentUser?.username || 'AS').slice(0, 2).toUpperCase()
-                )}
+                <img
+                  src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
+                  alt={currentUser?.username || 'User'}
+                  className="w-full h-full object-cover"
+                />
               </div>
             </button>
           ) : (

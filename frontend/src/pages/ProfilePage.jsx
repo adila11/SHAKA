@@ -16,11 +16,12 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Camera,
   Pencil
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
+import ProfilePictureModal from '../components/modals/ProfilePictureModal';
+import { getProfileImageUrl } from '../data/financeData';
 
 export default function ProfilePage() {
   const {
@@ -51,53 +52,24 @@ export default function ProfilePage() {
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
 
   // Profile Picture & Username Edit states
+  const [isPictureModalOpen, setIsPictureModalOpen] = useState(false);
   const [isEditingUsername, setIsEditingUsername] = useState(false);
   const [editUsernameValue, setEditUsernameValue] = useState(currentUser?.username || '');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState(null);
 
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setProfileFeedback({ type: 'error', message: 'Please select an image file.' });
-      return;
-    }
-
-    if (file.size > 2 * 1024 * 1024) {
-      setProfileFeedback({ type: 'error', message: 'Image size should be less than 2MB.' });
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64Data = reader.result;
-      setIsSavingProfile(true);
-      setProfileFeedback(null);
-      const res = await updateProfile({ avatar: base64Data });
-      setIsSavingProfile(false);
-      if (res.success) {
-        setProfileFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
-        setTimeout(() => setProfileFeedback(null), 3000);
-      } else {
-        setProfileFeedback({ type: 'error', message: res.message || 'Failed to update photo.' });
-      }
-    };
-    reader.readAsDataURL(file);
-    e.target.value = '';
-  };
-
-  const handleRemovePhoto = async () => {
+  const handleSaveProfilePicture = async (selectedId) => {
     setIsSavingProfile(true);
     setProfileFeedback(null);
-    const res = await updateProfile({ avatar: '' });
+    const res = await updateProfile({ profileImage: selectedId, avatar: selectedId });
     setIsSavingProfile(false);
     if (res.success) {
-      setProfileFeedback({ type: 'success', message: 'Profile picture removed.' });
+      setProfileFeedback({ type: 'success', message: 'Profile picture updated successfully!' });
       setTimeout(() => setProfileFeedback(null), 3000);
+      return { success: true };
     } else {
-      setProfileFeedback({ type: 'error', message: res.message || 'Failed to remove photo.' });
+      setProfileFeedback({ type: 'error', message: res.message || 'Failed to update profile picture.' });
+      return { success: false, message: res.message };
     }
   };
 
@@ -289,63 +261,47 @@ export default function ProfilePage() {
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
             }`}
           >
-            {/* Avatar with Photo Upload Overlay */}
+            {/* Avatar with Edit Option */}
             <div className="relative w-24 h-24 mx-auto mb-3">
-              <div className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center shadow-lg shadow-[#c9b27c]/15">
-                {currentUser?.avatar ? (
-                  <img
-                    src={currentUser.avatar}
-                    alt={currentUser?.username || 'Profile'}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span>{(currentUser?.username || 'AS').slice(0, 2).toUpperCase()}</span>
-                )}
-              </div>
+              <button
+                type="button"
+                onClick={() => setIsPictureModalOpen(true)}
+                title="Click to edit profile picture"
+                className="w-24 h-24 rounded-full overflow-hidden bg-gradient-to-tr from-[#26262b] to-[#1f1f24] border-2 border-[#c9b27c] text-[#c9b27c] text-2xl font-black flex items-center justify-center shadow-lg shadow-[#c9b27c]/15 hover:opacity-95 transition-all cursor-pointer group"
+              >
+                <img
+                  src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
+                  alt={currentUser?.username || 'Profile'}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                />
+              </button>
 
-              {/* Upload Button Overlay */}
-              <label
-                htmlFor="profile-avatar-upload"
-                title="Upload Profile Picture"
+              {/* Edit Badge Button Overlay */}
+              <button
+                type="button"
+                onClick={() => setIsPictureModalOpen(true)}
+                title="Edit Profile Picture"
                 className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#c9b27c] text-neutral-950 flex items-center justify-center cursor-pointer shadow-md hover:scale-110 active:scale-95 transition-all"
+                aria-label="Edit Profile Picture"
               >
                 {isSavingProfile ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Camera className="w-4 h-4 stroke-[2.5]" />
+                  <Pencil className="w-3.5 h-3.5 stroke-[2.5]" />
                 )}
-                <input
-                  id="profile-avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageUpload}
-                  disabled={isSavingProfile}
-                />
-              </label>
+              </button>
             </div>
 
-            {/* Photo Action Links */}
-            <div className="flex items-center justify-center gap-3 mb-3">
-              <label
-                htmlFor="profile-avatar-upload"
-                className="text-[11px] font-semibold text-[#c9b27c] hover:underline cursor-pointer"
+            {/* Edit Profile Picture Action Link */}
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <button
+                type="button"
+                onClick={() => setIsPictureModalOpen(true)}
+                className="text-[11px] font-semibold text-[#c9b27c] hover:underline cursor-pointer inline-flex items-center gap-1"
               >
-                {currentUser?.avatar ? 'Change photo' : 'Add photo'}
-              </label>
-              {currentUser?.avatar && (
-                <>
-                  <span className="text-[#8a8a93] text-xs">•</span>
-                  <button
-                    type="button"
-                    onClick={handleRemovePhoto}
-                    disabled={isSavingProfile}
-                    className="text-[11px] font-semibold text-[#d97070] hover:underline cursor-pointer disabled:opacity-50"
-                  >
-                    Remove
-                  </button>
-                </>
-              )}
+                <Pencil className="w-3 h-3" />
+                <span>Edit photo</span>
+              </button>
             </div>
 
             {/* Feedback Alert for Profile Actions */}
@@ -699,19 +655,19 @@ export default function ProfilePage() {
       {modalType === 'enable' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div
-            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
             }`}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold">Enable Access Code</h3>
-              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+            <div className="flex items-center justify-between mb-4 min-w-0">
+              <h3 className="text-base font-bold truncate">Enable Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <p className={`text-xs mb-4 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              Create a 4-digit numeric access code (PIN). This code will belong exclusively to your admin account (<span className="font-mono font-bold text-[#c9b27c]">{currentUser?.username}</span>) and is stored securely using bcrypt hashing.
+              Create a 4-digit numeric access code (PIN). This code will belong exclusively to your admin account (<span className="font-mono font-bold text-[#c9b27c] break-all">{currentUser?.username}</span>) and is stored securely using bcrypt hashing.
             </p>
 
             {feedback && (
@@ -727,7 +683,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <form onSubmit={handleEnable} className="space-y-4">
+            <form onSubmit={handleEnable} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold mb-1">New 4-Digit Access Code</label>
                 <input
@@ -736,8 +692,6 @@ export default function ProfilePage() {
                   onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                   placeholder="4-digit PIN (e.g. 1234)"
                   className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -753,8 +707,6 @@ export default function ProfilePage() {
                   onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                   placeholder="Re-enter 4-digit PIN"
                   className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -798,13 +750,13 @@ export default function ProfilePage() {
       {modalType === 'change' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div
-            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
             }`}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold">Change Access Code</h3>
-              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+            <div className="flex items-center justify-between mb-4 min-w-0">
+              <h3 className="text-base font-bold truncate">Change Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -822,7 +774,7 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <form onSubmit={handleChange} className="space-y-3.5">
+            <form onSubmit={handleChange} noValidate className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold mb-1">Current 4-Digit Access Code</label>
                 <input
@@ -831,8 +783,6 @@ export default function ProfilePage() {
                   onChange={(e) => setCurrentCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                   placeholder="Enter current PIN"
                   className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -848,8 +798,6 @@ export default function ProfilePage() {
                   onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                   placeholder="New 4-digit PIN"
                   className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -865,8 +813,6 @@ export default function ProfilePage() {
                   onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
                   inputMode="numeric"
-                  pattern="[0-9]*"
-                  required
                   placeholder="Re-enter new 4-digit PIN"
                   className={`w-full h-11 px-3 text-center tracking-[0.3em] rounded-xl border text-base font-mono outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -910,25 +856,25 @@ export default function ProfilePage() {
       {modalType === 'view_reset' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div
-            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
             }`}
           >
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-bold">Access Code Security & Reset</h3>
-              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+            <div className="flex items-center justify-between mb-3 min-w-0">
+              <h3 className="text-base font-bold truncate">Access Code Security & Reset</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Cryptographic Security Notice */}
             <div
-              className={`p-4 rounded-xl border mb-4 space-y-2 text-xs ${
+              className={`p-4 rounded-xl border mb-4 space-y-2 text-xs min-w-0 break-words ${
                 isDark ? 'bg-[#0e0e10] border-[#c9b27c]/40 text-[#8a8a93]' : 'bg-[#faf9f6] border-[#c9b27c]/40 text-[#71717a]'
               }`}
             >
               <div className="flex items-center gap-2 text-[#c9b27c] font-bold">
-                <Lock className="w-4 h-4" />
+                <Lock className="w-4 h-4 shrink-0" />
                 <span>One-Way Cryptographic Security</span>
               </div>
               <p>
@@ -952,14 +898,13 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <form onSubmit={handleReset} className="space-y-3.5">
+            <form onSubmit={handleReset} noValidate className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold mb-1">Account Password (for verification)</label>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={accountPassword}
                   onChange={(e) => setAccountPassword(e.target.value)}
-                  required
                   placeholder="Enter login password"
                   className={`w-full h-11 px-3 rounded-xl border text-sm outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -972,11 +917,9 @@ export default function ProfilePage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={accessCode}
                   onChange={(e) => setAccessCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
-                  required
                   placeholder="4-digit PIN"
                   className={`w-full h-11 px-3 rounded-xl border text-sm font-mono tracking-widest outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -989,11 +932,9 @@ export default function ProfilePage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={confirmCode}
                   onChange={(e) => setConfirmCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
-                  required
                   placeholder="Re-enter 4-digit PIN"
                   className={`w-full h-11 px-3 rounded-xl border text-sm font-mono tracking-widest outline-none focus:border-[#c9b27c] ${
                     isDark ? 'bg-[#0e0e10] border-[#26262b]' : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -1037,13 +978,13 @@ export default function ProfilePage() {
       {modalType === 'disable' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div
-            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors ${
+            className={`w-full max-w-md rounded-2xl p-6 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
               isDark ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]' : 'bg-white border-[#e5e3dc] text-[#18181b]'
             }`}
           >
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-[#d97070]">Disable Access Code</h3>
-              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white">
+            <div className="flex items-center justify-between mb-4 min-w-0">
+              <h3 className="text-base font-bold text-[#d97070] truncate">Disable Access Code</h3>
+              <button type="button" onClick={closeModal} className="p-1 rounded-lg text-[#8a8a93] hover:text-white shrink-0">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -1065,13 +1006,12 @@ export default function ProfilePage() {
               </div>
             )}
 
-            <form onSubmit={handleDisable} className="space-y-4">
+            <form onSubmit={handleDisable} noValidate className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold mb-1">Current Access Code (4 digits)</label>
                 <input
                   type={showPassword ? 'text' : 'password'}
                   inputMode="numeric"
-                  pattern="[0-9]*"
                   value={currentCode}
                   onChange={(e) => setCurrentCode(e.target.value.replace(/\D/g, '').slice(0, 4))}
                   maxLength={4}
@@ -1117,6 +1057,13 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+      {/* Profile Picture Selection Modal */}
+      <ProfilePictureModal
+        isOpen={isPictureModalOpen}
+        onClose={() => setIsPictureModalOpen(false)}
+        currentImage={currentUser?.profileImage || currentUser?.avatar}
+        onSave={handleSaveProfilePicture}
+      />
     </div>
   );
 }

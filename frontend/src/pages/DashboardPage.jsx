@@ -78,22 +78,25 @@ export default function DashboardPage() {
       </div>
 
       {/* Top 4 Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0 max-w-full">
         {/* Metric 1 */}
         <div
-          className={`p-4 rounded-2xl border transition-colors shadow-sm ${
+          className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
-          <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+          <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Total Spent
           </span>
-          <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(totalSpent)}
+          <div
+            className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}
+            title={formatCurrency(totalSpent)}
+          >
+            {isLoading ? <Skeleton className="h-6 sm:h-7 w-20 sm:w-28 my-1" /> : formatCurrency(totalSpent)}
           </div>
-          <span className="text-[11px] font-medium text-[#c9b27c] mt-1 inline-block">
+          <span className="text-[10px] sm:text-[11px] font-medium text-[#c9b27c] mt-1 truncate block">
             {isLoading ? (
-              <Skeleton className="h-3 w-20" />
+              <Skeleton className="h-3 w-16 sm:w-20" />
             ) : (
               `${monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of limit`
             )}
@@ -102,64 +105,73 @@ export default function DashboardPage() {
 
         {/* Metric 2 */}
         <div
-          className={`p-4 rounded-2xl border transition-colors shadow-sm ${
+          className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
-          <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+          <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Remaining Budget
           </span>
-          <div className="text-2xl font-black font-mono tracking-tight mt-1 text-[#8fb39a]">
-            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(Math.max(0, monthlyLimit - totalSpent))}
+          <div
+            className="text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 text-[#8fb39a] truncate block max-w-full"
+            title={formatCurrency(Math.max(0, monthlyLimit - totalSpent))}
+          >
+            {isLoading ? <Skeleton className="h-6 sm:h-7 w-20 sm:w-28 my-1" /> : formatCurrency(Math.max(0, monthlyLimit - totalSpent))}
           </div>
-          <span className={`text-[11px] font-medium mt-1 inline-block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            {isLoading ? <Skeleton className="h-3 w-24" /> : `Limit: ${formatCurrency(monthlyLimit)}`}
+          <span
+            className={`text-[10px] sm:text-[11px] font-medium mt-1 truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}
+            title={`Limit: ${formatCurrency(monthlyLimit)}`}
+          >
+            {isLoading ? <Skeleton className="h-3 w-16 sm:w-24" /> : `Limit: ${formatCurrency(monthlyLimit)}`}
           </span>
         </div>
 
         {/* Metric 3 */}
         <div
-          className={`p-4 rounded-2xl border transition-colors shadow-sm ${
+          className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
-          <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+          <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Daily Average
           </span>
-          <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {isLoading ? <Skeleton className="h-7 w-28 my-1" /> : formatCurrency(Math.round(totalSpent / 22))}
+          <div
+            className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}
+            title={formatCurrency(Math.round(totalSpent / 22))}
+          >
+            {isLoading ? <Skeleton className="h-6 sm:h-7 w-20 sm:w-28 my-1" /> : formatCurrency(Math.round(totalSpent / 22))}
           </div>
-          <span className="text-[11px] font-semibold text-[#8fb39a] mt-1 inline-block">
+          <span className="text-[10px] sm:text-[11px] font-semibold text-[#8fb39a] mt-1 truncate block">
             Normalized pace
           </span>
         </div>
 
         {/* Metric 4 */}
         <div
-          className={`p-4 rounded-2xl border transition-colors shadow-sm ${
+          className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
             isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
           }`}
         >
-          <span className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+          <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Shared Members
           </span>
-          <div className={`text-2xl font-black font-mono tracking-tight mt-1 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {isLoading ? <Skeleton className="h-7 w-24 my-1" /> : `${householdMembers?.length || 2} Active`}
+          <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+            {isLoading ? <Skeleton className="h-6 sm:h-7 w-16 sm:w-24 my-1" /> : `${householdMembers?.length || 2} Active`}
           </div>
-          <span className="text-[11px] font-semibold text-[#c9b27c] mt-1 inline-flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5" />
-            Admin verified
+          <span className="text-[10px] sm:text-[11px] font-semibold text-[#c9b27c] mt-1 inline-flex items-center gap-1 truncate">
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Admin verified</span>
           </span>
         </div>
       </div>
 
       {/* Main Grid: Widgets & Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start min-w-0 max-w-full">
         {/* Left Column (7 cols on desktop): Budget Cards & Donut Chart */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className="lg:col-span-7 space-y-6 min-w-0 max-w-full">
           <MonthlyLimitWidget />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 min-w-0 max-w-full">
             <ProjectedSpendWidget />
             <StatCardsWidget />
           </div>
@@ -168,7 +180,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Right Column (5 cols on desktop): Recent Shared Ledger Feed */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className="lg:col-span-5 space-y-6 min-w-0 max-w-full">
           <div
             className={`p-5 rounded-2xl border transition-colors shadow-sm ${
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
@@ -233,8 +245,8 @@ export default function DashboardPage() {
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <div className={`text-xs font-bold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    <div className="text-right shrink-0 min-w-0 max-w-[45%]">
+                      <div className={`text-xs font-bold font-mono truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`} title={formatCurrency(tx.amount)}>
                         {formatCurrency(tx.amount)}
                       </div>
                     </div>

@@ -44,16 +44,16 @@ export default function DonutSpendWidget({ customTheme = null }) {
 
   return (
     <div
-      className={`p-4 rounded-2xl border shadow-sm transition-colors ${
+      className={`p-4 rounded-2xl border shadow-sm transition-colors min-w-0 max-w-full overflow-hidden ${
         isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
       }`}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className={`text-[11px] uppercase tracking-wider font-semibold ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+      <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+        <span className={`text-[11px] uppercase tracking-wider font-semibold truncate shrink-0 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
           Spending by Category
         </span>
         {topCategory && (
-          <span className="text-[11px] font-semibold text-[#c9b27c]">
+          <span className="text-[11px] font-semibold text-[#c9b27c] truncate text-right min-w-0" title={`Top: ${topCategory.name} (${formatCurrency(topCategory.spent)})`}>
             Top: {topCategory.name} ({formatCurrency(topCategory.spent)})
           </span>
         )}
@@ -91,7 +91,7 @@ export default function DonutSpendWidget({ customTheme = null }) {
 
         {/* Center Pill */}
         <div
-          className={`absolute flex flex-col items-center justify-center w-20 h-20 rounded-full border shadow-inner ${
+          className={`absolute flex flex-col items-center justify-center w-20 h-20 rounded-full border shadow-inner px-1 ${
             isDark
               ? 'bg-[#0e0e10] border-[#26262b]'
               : 'bg-[#f6f5f2] border-[#e5e3dc]'
@@ -100,7 +100,10 @@ export default function DonutSpendWidget({ customTheme = null }) {
           <span className={`text-[9px] uppercase tracking-wider font-medium ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Nov Total
           </span>
-          <span className={`text-xs font-black font-mono tracking-tight mt-0.5 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+          <span
+            className={`text-xs font-black font-mono tracking-tight mt-0.5 truncate max-w-[65px] text-center ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}
+            title={formatCurrency(totalSpent)}
+          >
             {isLoading ? <Skeleton className="w-10 h-3 my-0.5" /> : formatShort(totalSpent)}
           </span>
         </div>

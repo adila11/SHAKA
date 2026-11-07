@@ -4,6 +4,36 @@ import { DEFAULT_USER, DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData'
 
 const FinanceContext = createContext();
 
+// Helper to sort transactions descending (newest first)
+const sortTransactionsNewestFirst = (list) => {
+  if (!Array.isArray(list)) return [];
+  return [...list].sort((a, b) => {
+    if (a.time === 'Just now' && b.time !== 'Just now') return -1;
+    if (b.time === 'Just now' && a.time !== 'Just now') return 1;
+    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    if (timeA && timeB && timeA !== timeB) return timeB - timeA;
+    const dateA = new Date(a.fullDate || a.date).getTime();
+    const dateB = new Date(b.fullDate || b.date).getTime();
+    if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) return dateB - dateA;
+    return 0;
+  });
+};
+
+// Helper to prevent duplicate entries
+const deduplicateTransactions = (list) => {
+  if (!Array.isArray(list)) return [];
+  const seen = new Set();
+  const deduped = [];
+  for (const item of list) {
+    if (item && item.id && !seen.has(item.id)) {
+      seen.add(item.id);
+      deduped.push(item);
+    }
+  }
+  return deduped;
+};
+
 export function FinanceProvider({ children }) {
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   const [viewMode, setViewMode] = useState('page'); // 'page' | 'all' | 'single'
@@ -96,7 +126,7 @@ export function FinanceProvider({ children }) {
       }
 
       if (txRes.status === 'fulfilled' && txRes.value?.success) {
-        setTransactions(txRes.value.data || []);
+        setTransactions(sortTransactionsNewestFirst(deduplicateTransactions(txRes.value.data || [])));
       }
 
       if (catRes.status === 'fulfilled' && catRes.value?.success) {
@@ -250,7 +280,16 @@ export function FinanceProvider({ children }) {
   }, [transactions]);
 
   // Add Expense to backend
-  const addExpense = async ({ amount, category, description, date = 'Nov 22', fullDate, time = 'Just now', user }) => {
+  const addExpense = async ({
+    amount,
+    category,
+    description,
+    date = 'Nov 22',
+    fullDate,
+    time = 'Just now',
+    user,
+    authorizationToken,
+  }) => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) {
       return { success: false, message: 'Valid positive amount is required' };
@@ -266,11 +305,15 @@ export function FinanceProvider({ children }) {
         time,
         user: user || currentUser?.username || 'abdulshamil',
         isSplit: true,
+        authorizationToken,
       });
 
       if (res.success && res.data) {
         setIsBackendConnected(true);
-        setTransactions(prev => [res.data, ...prev]);
+        setTransactions(prev => {
+          const combined = [res.data, ...prev.filter(t => t.id !== res.data.id)];
+          return sortTransactionsNewestFirst(deduplicateTransactions(combined));
+        });
 
         // Optimistically update budget categories
         setBudgetCategories(prev =>
@@ -293,11 +336,37 @@ export function FinanceProvider({ children }) {
         setIsAddExpenseModalOpen(false);
         return { success: true, data: res.data };
       }
-      return { success: false, message: res.message || 'Failed to log expense' };
+      return {
+        success: false,
+        requiresAuthorization: res.requiresAuthorization,
+        message: res.message || 'Failed to log expense',
+      };
     } catch (err) {
       console.error('Failed to add expense:', err);
       setIsBackendConnected(false);
-      return { success: false, message: err.message || 'Network error while adding expense' };
+      return {
+        success: false,
+        requiresAuthorization: err.status === 403,
+        message: err.message || 'Network error while adding expense',
+      };
+    }
+  };
+
+  // Authorize expense exceeding ₹7,000 threshold
+  const authorizeExpense = async ({ amount, credential, credentialType, user }) => {
+    try {
+      const res = await api.transactions.authorizeExpense({
+        amount: Number(amount),
+        credential,
+        credentialType,
+        user: user || currentUser?.username || 'abdulshamil',
+      });
+      return res;
+    } catch (err) {
+      return {
+        success: false,
+        message: err.message || 'Verification failed. Please check your credentials.',
+      };
     }
   };
 
@@ -453,10 +522,18 @@ export function FinanceProvider({ children }) {
     }
   };
 
-  // Update User Profile (Username & Avatar)
-  const updateProfile = async ({ username: newUsername, avatar }) => {
+  // Update User Profile (Username & Profile Image)
+  const updateProfile = async ({ username: newUsername, avatar, profileImage }) => {
     try {
-      const res = await api.auth.updateProfile({ username: newUsername, avatar });
+      const payload = {};
+      if (newUsername !== undefined) payload.username = newUsername;
+      if (avatar !== undefined) payload.avatar = avatar;
+      if (profileImage !== undefined) payload.profileImage = profileImage;
+      // If profileImage is provided without avatar, or vice versa, keep them in sync
+      if (profileImage && !avatar) payload.avatar = profileImage;
+      if (avatar && !profileImage) payload.profileImage = avatar;
+
+      const res = await api.auth.updateProfile(payload);
       if (res.success) {
         if (res.token) {
           localStorage.setItem('shaka_token', res.token);
@@ -464,14 +541,19 @@ export function FinanceProvider({ children }) {
         if (res.user) {
           setCurrentUser(prev => ({ ...prev, ...res.user }));
         }
+        setHouseholdMembers(prev =>
+          prev.map(m =>
+            m.username === currentUser.username || (newUsername && m.username === newUsername)
+              ? {
+                  ...m,
+                  username: newUsername || m.username,
+                  avatar: res.user?.avatar !== undefined ? res.user.avatar : m.avatar,
+                  profileImage: res.user?.profileImage !== undefined ? res.user.profileImage : m.profileImage,
+                }
+              : m
+          )
+        );
         if (newUsername) {
-          setHouseholdMembers(prev =>
-            prev.map(m =>
-              m.username === currentUser.username
-                ? { ...m, username: newUsername, avatar: res.user?.avatar !== undefined ? res.user.avatar : m.avatar }
-                : m
-            )
-          );
           setTransactions(prev =>
             prev.map(t =>
               t.user?.toLowerCase() === currentUser.username.toLowerCase()
@@ -619,6 +701,7 @@ export function FinanceProvider({ children }) {
         todayLogsCount,
         categoryTotals,
         addExpense,
+        authorizeExpense,
         updateCategoryLimit,
         addCategory,
         updateCategory,

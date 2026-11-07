@@ -17,7 +17,7 @@ export default function ResponsiveLayout({ children }) {
       <Navbar />
 
       {/* Main Responsive Page Viewport */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12">
+      <main className="flex-1 w-full max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 py-6 pb-24 md:pb-12 min-w-0 max-w-full overflow-x-hidden">
         {children}
       </main>
 

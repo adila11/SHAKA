@@ -44,7 +44,12 @@ const userSchema = new mongoose.Schema(
     },
     avatar: {
       type: String,
-      default: '',
+      default: 'profile1',
+    },
+    profileImage: {
+      type: String,
+      enum: ['profile1', 'profile2'],
+      default: 'profile1',
     },
     password: {
       type: String,
