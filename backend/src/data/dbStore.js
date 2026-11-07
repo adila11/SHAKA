@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { User } from '../models/User.js';
 import { Transaction } from '../models/Transaction.js';
 import { BudgetCategory } from '../models/BudgetCategory.js';
-import { Setting } from '../models/Setting.js';
+import { AdminPasswordResetRequest } from '../models/AdminPasswordResetRequest.js';
 import { INITIAL_DATA } from './initialData.js';
 
 // In-memory memory mirror initialized with exact requested users and initial data
@@ -19,11 +19,7 @@ const memState = {
     updatedAt: t.updatedAt || new Date(`${t.fullDate || t.date + ', 2026'} ${t.time || '12:00 PM'}`).toISOString(),
   })),
   budgetCategories: JSON.parse(JSON.stringify(INITIAL_DATA.budgetCategories)),
-  setting: {
-    key: 'global',
-    monthlyLimit: INITIAL_DATA.monthlyLimit,
-    availableCategories: INITIAL_DATA.availableCategories,
-  },
+  adminPasswordResetRequests: [],
 };
 
 export const isDbConnected = () => mongoose.connection.readyState === 1;
@@ -115,9 +111,6 @@ export const dbStore = {
           { new: true }
         ).lean();
 
-        if (newUsername && newUsername.toLowerCase() !== currentUsername.toLowerCase()) {
-          await Transaction.updateMany({ user: currentUsername }, { $set: { user: newUsername } });
-        }
         return updated;
       }
 
@@ -129,14 +122,6 @@ export const dbStore = {
           memUser.avatar = img;
         }
         memUser.updatedAt = updates.updatedAt;
-      }
-
-      if (newUsername && newUsername.toLowerCase() !== currentUsername.toLowerCase()) {
-        memState.transactions.forEach(t => {
-          if (t.user.toLowerCase() === currentUsername.toLowerCase()) {
-            t.user = newUsername;
-          }
-        });
       }
 
       return memUser || { username: newUsername || currentUsername, profileImage: img || 'profile1', avatar: img || 'profile1' };
@@ -222,6 +207,20 @@ export const dbStore = {
         }
       }
     },
+    revokeAllSessions: async (username) => {
+      if (isDbConnected()) {
+        await User.updateOne(
+          { username },
+          { $set: { 'sessions.$[].revoked': true } }
+        );
+      }
+      const user = memState.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+      if (user && user.sessions) {
+        user.sessions.forEach(s => {
+          s.revoked = true;
+        });
+      }
+    },
     updateAccessCode: async (username, { accessCodeEnabled, accessCodeHash }) => {
       const updates = {
         accessCodeEnabled,
@@ -288,8 +287,8 @@ export const dbStore = {
         if (filter.category && filter.category !== 'All') {
           query.category = new RegExp(`^${filter.category}$`, 'i');
         }
-        if (filter.user) {
-          query.user = new RegExp(`^${filter.user}$`, 'i');
+        if (filter.type) {
+          query.type = filter.type;
         }
         if (filter.isSplit !== undefined) {
           query.isSplit = filter.isSplit;
@@ -298,7 +297,6 @@ export const dbStore = {
           query.$or = [
             { description: { $regex: filter.search, $options: 'i' } },
             { category: { $regex: filter.search, $options: 'i' } },
-            { user: { $regex: filter.search, $options: 'i' } },
           ];
         }
         const list = await Transaction.find(query).sort({ createdAt: -1 }).lean();
@@ -309,8 +307,8 @@ export const dbStore = {
       if (filter.category && filter.category !== 'All') {
         list = list.filter(t => t.category.toLowerCase() === filter.category.toLowerCase());
       }
-      if (filter.user) {
-        list = list.filter(t => t.user.toLowerCase() === filter.user.toLowerCase());
+      if (filter.type) {
+        list = list.filter(t => (t.type || 'expense') === filter.type);
       }
       if (filter.isSplit !== undefined) {
         list = list.filter(t => t.isSplit === filter.isSplit);
@@ -320,8 +318,7 @@ export const dbStore = {
         list = list.filter(
           t =>
             t.description.toLowerCase().includes(q) ||
-            t.category.toLowerCase().includes(q) ||
-            t.user.toLowerCase().includes(q)
+            t.category.toLowerCase().includes(q)
         );
       }
 
@@ -352,11 +349,35 @@ export const dbStore = {
       return memState.transactions.find(t => t.id === id) || null;
     },
     create: async (txData) => {
+      const formatted = {
+        ...txData,
+        type: txData.type === 'income' ? 'income' : 'expense',
+      };
+
       if (isDbConnected()) {
-        await Transaction.create(txData);
+        // Link categoryId if matching BudgetCategory exists
+        if (!formatted.categoryId && formatted.category) {
+          const matchCat = await BudgetCategory.findOne({
+            category: new RegExp(`^${formatted.category}$`, 'i'),
+          }).lean();
+          if (matchCat) {
+            formatted.categoryId = matchCat._id;
+          }
+        }
+        await Transaction.create(formatted);
+      } else {
+        if (!formatted.categoryId && formatted.category) {
+          const matchCat = memState.budgetCategories.find(
+            c => c.category.toLowerCase() === formatted.category.toLowerCase()
+          );
+          if (matchCat) {
+            formatted.categoryId = matchCat.id;
+          }
+        }
       }
-      memState.transactions.unshift(txData);
-      return txData;
+
+      memState.transactions.unshift(formatted);
+      return formatted;
     },
     update: async (id, updates) => {
       if (isDbConnected()) {
@@ -387,37 +408,291 @@ export const dbStore = {
     },
   },
 
-  // BUDGET CATEGORIES
+  // BUDGET CATEGORIES (DYNAMIC AGGREGATION FROM SHARED TRANSACTIONS)
   budget: {
     getCategories: async () => {
       if (isDbConnected()) {
-        const list = await BudgetCategory.find().lean();
-        return list.map(({ _id, __v, ...c }) => c);
+        // Dynamic aggregation joining BudgetCategory with shared expense transactions
+        const aggregated = await BudgetCategory.aggregate([
+          {
+            $lookup: {
+              from: 'transactions',
+              let: { catName: { $toLower: '$category' }, catId: '$_id' },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: {
+                      $and: [
+                        { $ne: ['$type', 'income'] }, // expense transactions
+                        {
+                          $or: [
+                            { $eq: [{ $toLower: '$category' }, '$$catName'] },
+                            { $eq: ['$categoryId', '$$catId'] },
+                          ],
+                        },
+                      ],
+                    },
+                  },
+                },
+                {
+                  $group: {
+                    _id: null,
+                    totalSpent: { $sum: '$amount' },
+                    transactionCount: { $sum: 1 },
+                  },
+                },
+              ],
+              as: 'spending',
+            },
+          },
+          {
+            $unwind: {
+              path: '$spending',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $project: {
+              _id: 1,
+              id: 1,
+              name: 1,
+              category: 1,
+              limit: 1,
+              color: 1,
+              spent: { $ifNull: ['$spending.totalSpent', 0] },
+              transactionCount: { $ifNull: ['$spending.transactionCount', 0] },
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+          {
+            $sort: { spent: -1 },
+          },
+        ]);
+
+        return aggregated.map(cat => {
+          const spent = Number(cat.spent || 0);
+          const limit = Number(cat.limit || 0);
+          const remaining = limit - spent;
+          const percentage = limit > 0 ? Number(((spent / limit) * 100).toFixed(1)) : 0;
+          let status = 'Healthy';
+          let statusColor = '#8fb39a';
+          if (percentage >= 100) {
+            status = 'Exceeded';
+            statusColor = '#d97070';
+          } else if (percentage >= 80) {
+            status = 'Warning';
+            statusColor = '#d4a359';
+          }
+          return {
+            id: cat.id,
+            _id: cat._id,
+            name: cat.name,
+            category: cat.category,
+            limit,
+            spent,
+            remaining,
+            percentage,
+            color: cat.color || '#c9b27c',
+            status,
+            statusColor,
+            transactionCount: cat.transactionCount || 0,
+            createdAt: cat.createdAt,
+            updatedAt: cat.updatedAt,
+          };
+        });
       }
-      return memState.budgetCategories;
+
+      // In-memory memory mirror dynamic calculation
+      const categories = [...memState.budgetCategories];
+      const expenseTxs = memState.transactions.filter(t => t.type !== 'income');
+
+      return categories
+        .map(cat => {
+          const matchingTxs = expenseTxs.filter(
+            t =>
+              (t.category && t.category.toLowerCase() === cat.category.toLowerCase()) ||
+              t.categoryId === cat.id
+          );
+          const spent = matchingTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
+          const limit = Number(cat.limit || 0);
+          const remaining = limit - spent;
+          const percentage = limit > 0 ? Number(((spent / limit) * 100).toFixed(1)) : 0;
+          let status = 'Healthy';
+          let statusColor = '#8fb39a';
+          if (percentage >= 100) {
+            status = 'Exceeded';
+            statusColor = '#d97070';
+          } else if (percentage >= 80) {
+            status = 'Warning';
+            statusColor = '#d4a359';
+          }
+          return {
+            id: cat.id,
+            name: cat.name,
+            category: cat.category,
+            limit,
+            spent,
+            remaining,
+            percentage,
+            color: cat.color || '#c9b27c',
+            status,
+            statusColor,
+            transactionCount: matchingTxs.length,
+            createdAt: cat.createdAt,
+            updatedAt: cat.updatedAt,
+          };
+        })
+        .sort((a, b) => b.spent - a.spent);
     },
     addCategory: async (categoryData) => {
+      const cleanName = (categoryData.name || '').trim();
+      const cleanCategory = (categoryData.category || cleanName).trim();
+
+      // Enforce category uniqueness across the shared ledger
       if (isDbConnected()) {
-        await BudgetCategory.create(categoryData);
+        const existing = await BudgetCategory.findOne({
+          $or: [
+            { category: new RegExp(`^${cleanCategory}$`, 'i') },
+            { name: new RegExp(`^${cleanName}$`, 'i') },
+          ],
+        });
+        if (existing) {
+          const err = new Error(`Category "${cleanCategory}" already exists in the shared ledger.`);
+          err.status = 400;
+          throw err;
+        }
+
+        const toSave = {
+          id: categoryData.id,
+          name: cleanName,
+          category: cleanCategory,
+          limit: Number(categoryData.limit) || 5000,
+          color: categoryData.color || '#c9b27c',
+        };
+        const created = await BudgetCategory.create(toSave);
+        return {
+          ...toSave,
+          _id: created._id,
+          spent: 0,
+          remaining: toSave.limit,
+          percentage: 0,
+          status: 'Healthy',
+          statusColor: '#8fb39a',
+          transactionCount: 0,
+        };
       }
-      memState.budgetCategories.push(categoryData);
-      return categoryData;
+
+      const existingMem = memState.budgetCategories.find(
+        c =>
+          c.category.toLowerCase() === cleanCategory.toLowerCase() ||
+          c.name.toLowerCase() === cleanName.toLowerCase()
+      );
+      if (existingMem) {
+        const err = new Error(`Category "${cleanCategory}" already exists in the shared ledger.`);
+        err.status = 400;
+        throw err;
+      }
+
+      const toSave = {
+        id: categoryData.id,
+        name: cleanName,
+        category: cleanCategory,
+        limit: Number(categoryData.limit) || 5000,
+        color: categoryData.color || '#c9b27c',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      memState.budgetCategories.push(toSave);
+      return {
+        ...toSave,
+        spent: 0,
+        remaining: toSave.limit,
+        percentage: 0,
+        status: 'Healthy',
+        statusColor: '#8fb39a',
+        transactionCount: 0,
+      };
     },
     updateCategory: async (id, updates) => {
+      const cleanName = updates.name !== undefined ? updates.name.trim() : undefined;
+      const cleanCategory = updates.category !== undefined ? updates.category.trim() : cleanName;
+
       if (isDbConnected()) {
-        const updated = await BudgetCategory.findOneAndUpdate({ id }, updates, { new: true }).lean();
-        if (updated) {
-          delete updated._id;
-          delete updated.__v;
-          return updated;
+        const existing = await BudgetCategory.findOne({ id });
+        if (!existing) return null;
+
+        // Check if renaming to a category name that already exists
+        if (cleanCategory && cleanCategory.toLowerCase() !== existing.category.toLowerCase()) {
+          const duplicate = await BudgetCategory.findOne({
+            id: { $ne: id },
+            $or: [
+              { category: new RegExp(`^${cleanCategory}$`, 'i') },
+              { name: new RegExp(`^${cleanName || cleanCategory}$`, 'i') },
+            ],
+          });
+          if (duplicate) {
+            const err = new Error(`Category "${cleanCategory}" already exists.`);
+            err.status = 400;
+            throw err;
+          }
+        }
+
+        const updateFields = {};
+        if (cleanName) updateFields.name = cleanName;
+        if (cleanCategory) updateFields.category = cleanCategory;
+        if (updates.limit !== undefined) updateFields.limit = Number(updates.limit);
+        if (updates.color) updateFields.color = updates.color;
+
+        await BudgetCategory.findOneAndUpdate({ id }, { $set: updateFields }, { new: true });
+
+        // If category was renamed, update all existing transactions in that category to keep history linked
+        if (cleanCategory && cleanCategory.toLowerCase() !== existing.category.toLowerCase()) {
+          await Transaction.updateMany(
+            { category: new RegExp(`^${existing.category}$`, 'i') },
+            { $set: { category: cleanCategory } }
+          );
+        }
+
+        const list = await dbStore.budget.getCategories();
+        return list.find(c => c.id === id) || null;
+      }
+
+      const existingMem = memState.budgetCategories.find(c => c.id === id);
+      if (!existingMem) return null;
+
+      if (cleanCategory && cleanCategory.toLowerCase() !== existingMem.category.toLowerCase()) {
+        const duplicate = memState.budgetCategories.find(
+          c =>
+            c.id !== id &&
+            (c.category.toLowerCase() === cleanCategory.toLowerCase() ||
+              c.name.toLowerCase() === (cleanName || cleanCategory).toLowerCase())
+        );
+        if (duplicate) {
+          const err = new Error(`Category "${cleanCategory}" already exists.`);
+          err.status = 400;
+          throw err;
         }
       }
-      const idx = memState.budgetCategories.findIndex(c => c.id === id);
-      if (idx !== -1) {
-        memState.budgetCategories[idx] = { ...memState.budgetCategories[idx], ...updates };
-        return memState.budgetCategories[idx];
+
+      const oldCategory = existingMem.category;
+      if (cleanName) existingMem.name = cleanName;
+      if (cleanCategory) existingMem.category = cleanCategory;
+      if (updates.limit !== undefined) existingMem.limit = Number(updates.limit);
+      if (updates.color) existingMem.color = updates.color;
+      existingMem.updatedAt = new Date().toISOString();
+
+      // If renamed, update matching transactions in memory
+      if (cleanCategory && cleanCategory.toLowerCase() !== oldCategory.toLowerCase()) {
+        memState.transactions.forEach(t => {
+          if (t.category && t.category.toLowerCase() === oldCategory.toLowerCase()) {
+            t.category = cleanCategory;
+          }
+        });
       }
-      return null;
+
+      const list = await dbStore.budget.getCategories();
+      return list.find(c => c.id === id) || null;
     },
     deleteCategory: async (id) => {
       if (isDbConnected()) {
@@ -432,62 +707,167 @@ export const dbStore = {
     },
     getMonthlyLimit: async () => {
       if (isDbConnected()) {
-        const setting = await Setting.findOne({ key: 'global' });
-        return setting?.monthlyLimit || 30000;
+        const categories = await BudgetCategory.find().lean();
+        return categories.reduce((sum, c) => sum + Number(c.limit || 0), 0);
       }
-      return memState.setting.monthlyLimit;
+      return memState.budgetCategories.reduce((sum, c) => sum + Number(c.limit || 0), 0);
     },
-    updateMonthlyLimit: async (limit) => {
-      if (isDbConnected()) {
-        await Setting.findOneAndUpdate({ key: 'global' }, { monthlyLimit: limit }, { upsert: true });
-      }
-      memState.setting.monthlyLimit = limit;
-      return limit;
+    updateMonthlyLimit: async () => {
+      // Spend limit is derived directly from the combined total of all individual category spend limits
+      return dbStore.budget.getMonthlyLimit();
     },
     getAvailableCategories: async () => {
       if (isDbConnected()) {
-        const setting = await Setting.findOne({ key: 'global' }).lean();
-        return setting?.availableCategories || INITIAL_DATA.availableCategories;
+        const categories = await BudgetCategory.find().select('name category color').lean();
+        if (categories && categories.length > 0) {
+          return categories.map(c => ({
+            name: c.name || c.category,
+            color: c.color || '#c9b27c',
+            icon: 'Tag',
+          }));
+        }
+        return INITIAL_DATA.availableCategories;
       }
-      return memState.setting.availableCategories;
+      if (memState.budgetCategories && memState.budgetCategories.length > 0) {
+        return memState.budgetCategories.map(c => ({
+          name: c.name || c.category,
+          color: c.color || '#c9b27c',
+          icon: 'Tag',
+        }));
+      }
+      return INITIAL_DATA.availableCategories;
     },
     addAvailableCategory: async (cat) => {
-      if (isDbConnected()) {
-        await Setting.findOneAndUpdate(
-          { key: 'global' },
-          { $addToSet: { availableCategories: cat } }
-        );
-      }
-      if (!memState.setting.availableCategories.some(c => c.name.toLowerCase() === cat.name.toLowerCase())) {
-        memState.setting.availableCategories.push(cat);
-      }
+      // Categories are dynamically stored in BudgetCategory; no separate settings collection needed
+      return cat;
     },
-    updateSpent: async (categoryName, numAmount) => {
+  },
+  // ADMIN PASSWORD RESET REQUESTS (TWO-ADMIN APPROVAL SYSTEM)
+  adminPasswordResetRequests: {
+    create: async (data) => {
+      const now = new Date();
       if (isDbConnected()) {
-        const cat = await BudgetCategory.findOne({ category: new RegExp(`^${categoryName}$`, 'i') });
-        if (cat) {
-          cat.spent += numAmount;
-          cat.status =
-            cat.spent > cat.limit ? 'Limit reached' : cat.spent >= cat.limit * 0.85 ? 'Near limit' : 'Healthy';
-          cat.statusColor =
-            cat.status === 'Limit reached' ? '#d97070' : cat.status === 'Near limit' ? '#d4a359' : '#8fb39a';
-          await cat.save();
+        const doc = new AdminPasswordResetRequest({
+          ...data,
+          createdAt: now,
+          updatedAt: now,
+        });
+        await doc.save();
+        return doc.toObject();
+      }
+
+      const memDoc = {
+        _id: `apr-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        id: undefined,
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      };
+      memDoc.id = memDoc._id;
+      memState.adminPasswordResetRequests.push(memDoc);
+      return { ...memDoc, toObject: () => ({ ...memDoc }) };
+    },
+    findById: async (id) => {
+      if (!id) return null;
+      if (isDbConnected()) {
+        return AdminPasswordResetRequest.findById(id);
+      }
+      const match = memState.adminPasswordResetRequests.find(r => r._id === id || r.id === id);
+      return match ? { ...match, toObject: () => ({ ...match }) } : null;
+    },
+    findActivePendingByRequester: async (username, email) => {
+      const now = new Date();
+      const userLower = (username || '').toLowerCase();
+      const emailLower = (email || '').toLowerCase();
+
+      if (isDbConnected()) {
+        return AdminPasswordResetRequest.findOne({
+          status: 'pending',
+          expiresAt: { $gt: now },
+          $or: [
+            { requestingAdminUsername: new RegExp(`^${userLower}$`, 'i') },
+            { requestingAdminEmail: new RegExp(`^${emailLower}$`, 'i') },
+          ],
+        });
+      }
+
+      const match = memState.adminPasswordResetRequests.find(r => {
+        if (r.status !== 'pending') return false;
+        if (new Date(r.expiresAt) <= now) return false;
+        return (
+          r.requestingAdminUsername.toLowerCase() === userLower ||
+          r.requestingAdminEmail.toLowerCase() === emailLower
+        );
+      });
+      return match ? { ...match, toObject: () => ({ ...match }) } : null;
+    },
+    findPendingForReviewer: async (reviewerUsername) => {
+      const now = new Date();
+      const reviewerLower = (reviewerUsername || '').toLowerCase();
+
+      if (isDbConnected()) {
+        // Expire old pending requests
+        await AdminPasswordResetRequest.updateMany(
+          { status: 'pending', expiresAt: { $lte: now } },
+          { $set: { status: 'expired' } }
+        );
+
+        return AdminPasswordResetRequest.find({
+          status: 'pending',
+          expiresAt: { $gt: now },
+          requestingAdminUsername: { $ne: reviewerUsername },
+        })
+          .sort({ createdAt: -1 })
+          .lean();
+      }
+
+      // In-memory: update expired
+      memState.adminPasswordResetRequests.forEach(r => {
+        if (r.status === 'pending' && new Date(r.expiresAt) <= now) {
+          r.status = 'expired';
         }
+      });
+
+      return memState.adminPasswordResetRequests
+        .filter(r => r.status === 'pending' && r.requestingAdminUsername.toLowerCase() !== reviewerLower)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    },
+    getAllForReviewer: async (reviewerUsername) => {
+      const reviewerLower = (reviewerUsername || '').toLowerCase();
+      if (isDbConnected()) {
+        return AdminPasswordResetRequest.find({
+          $or: [
+            { requestingAdminUsername: { $ne: reviewerUsername } },
+            { approvingAdminUsername: reviewerUsername },
+          ],
+        })
+          .sort({ createdAt: -1 })
+          .limit(20)
+          .lean();
       }
-      const memCat = memState.budgetCategories.find(
-        c => c.category.toLowerCase() === categoryName.toLowerCase()
-      );
-      if (memCat) {
-        memCat.spent += numAmount;
-        memCat.status =
-          memCat.spent > memCat.limit
-            ? 'Limit reached'
-            : memCat.spent >= memCat.limit * 0.85
-            ? 'Near limit'
-            : 'Healthy';
-        memCat.statusColor =
-          memCat.status === 'Limit reached' ? '#d97070' : memCat.status === 'Near limit' ? '#d4a359' : '#8fb39a';
+      return memState.adminPasswordResetRequests
+        .filter(r => r.requestingAdminUsername.toLowerCase() !== reviewerLower || r.approvingAdminUsername?.toLowerCase() === reviewerLower)
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, 20);
+    },
+    update: async (id, updates) => {
+      const now = new Date();
+      const finalUpdates = { ...updates, updatedAt: now };
+
+      if (isDbConnected()) {
+        return AdminPasswordResetRequest.findByIdAndUpdate(
+          id,
+          { $set: finalUpdates },
+          { new: true }
+        ).lean();
       }
+
+      const match = memState.adminPasswordResetRequests.find(r => r._id === id || r.id === id);
+      if (match) {
+        Object.assign(match, finalUpdates);
+        return { ...match, toObject: () => ({ ...match }) };
+      }
+      return null;
     },
   },
 };

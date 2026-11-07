@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Plus,
   Edit2,
@@ -7,7 +7,8 @@ import {
   X,
   AlertTriangle,
   CheckCircle2,
-  ShieldAlert
+  ShieldAlert,
+  Pipette,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
@@ -29,9 +30,12 @@ export default function BudgetPage() {
     totalSpent,
     monthlyLimit,
     remainingLimit,
+    daysRemaining,
+    monthName,
     addCategory,
     updateCategory,
     deleteCategory,
+    isActionPending,
     isLoading,
   } = useFinance();
   const { isDark } = useTheme();
@@ -42,6 +46,11 @@ export default function BudgetPage() {
   const [newCatLimit, setNewCatLimit] = useState('5000');
   const [newCatColor, setNewCatColor] = useState('#c9b27c');
   const [addCatError, setAddCatError] = useState('');
+  const customColorInputRef = useRef(null);
+
+  const isCustomColor = !COLOR_PALETTE.some(
+    (pal) => pal.hex.toLowerCase() === (newCatColor || '').toLowerCase()
+  );
 
   // State for editing a specific category
   const [editingCatId, setEditingCatId] = useState(null);
@@ -61,11 +70,13 @@ export default function BudgetPage() {
   // Save changes to category
   const handleSaveEdit = async (catId) => {
     if (!editName.trim()) return;
-    await updateCategory(catId, {
-      name: editName.trim(),
-      limit: Number(editLimit) || 1000,
-    });
+    const name = editName.trim();
+    const limit = Number(editLimit) || 1000;
     setEditingCatId(null);
+    await updateCategory(catId, {
+      name,
+      limit,
+    });
   };
 
   // Cancel edit
@@ -76,11 +87,12 @@ export default function BudgetPage() {
   // Confirm delete
   const confirmDeleteCategory = async () => {
     if (!categoryToDelete) return;
-    await deleteCategory(categoryToDelete.id);
-    if (editingCatId === categoryToDelete.id) {
+    const cat = categoryToDelete;
+    setCategoryToDelete(null);
+    if (editingCatId === cat.id) {
       setEditingCatId(null);
     }
-    setCategoryToDelete(null);
+    await deleteCategory(cat.id);
   };
 
   // Open delete confirmation modal
@@ -103,16 +115,28 @@ export default function BudgetPage() {
     }
 
     setAddCatError('');
-    await addCategory({
-      name: trimmed,
-      limit: numLimit,
-      color: newCatColor,
-    });
+    setIsAddModalOpen(false);
+
+    const savedName = trimmed;
+    const savedLimit = newCatLimit;
+    const savedColor = newCatColor;
 
     setNewCatName('');
     setNewCatLimit('5000');
     setNewCatColor('#c9b27c');
-    setIsAddModalOpen(false);
+
+    const res = await addCategory({
+      name: savedName,
+      limit: numLimit,
+      color: savedColor,
+    });
+
+    if (!res.success) {
+      // Preserve user-entered info if submission failed
+      setNewCatName(savedName);
+      setNewCatLimit(savedLimit);
+      setNewCatColor(savedColor);
+    }
   };
 
   return (
@@ -200,7 +224,7 @@ export default function BudgetPage() {
             {isLoading ? <Skeleton className="w-32 h-3" /> : `${monthlyLimit > 0 ? ((totalSpent / monthlyLimit) * 100).toFixed(1) : '0.0'}% of total cap utilized`}
           </span>
           <span className={`shrink-0 text-right ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            8 days remaining in November
+            {daysRemaining} days remaining in {monthName}
           </span>
         </div>
       </div>
@@ -305,15 +329,15 @@ export default function BudgetPage() {
                   <div className="flex items-center gap-1.5 shrink-0 min-w-0">
                     {!isEditingThis && (
                       <>
-                        {cat.status === 'Limit reached' ? (
+                        {cat.status === 'Limit reached' || cat.status === 'Exceeded' ? (
                           <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#d97070]/20 text-[#d97070] font-bold border border-[#d97070]/30 flex items-center gap-1 shrink-0">
                             <ShieldAlert className="w-3 h-3" />
-                            <span className="truncate">Limit reached</span>
+                            <span className="truncate">{cat.status === 'Exceeded' ? 'Exceeded' : 'Limit reached'}</span>
                           </span>
-                        ) : cat.status === 'Near limit' ? (
+                        ) : cat.status === 'Near limit' || cat.status === 'Warning' ? (
                           <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#d4a359]/20 text-[#d4a359] font-bold border border-[#d4a359]/30 flex items-center gap-1 shrink-0">
                             <AlertTriangle className="w-3 h-3" />
-                            <span className="truncate">Near limit</span>
+                            <span className="truncate">{cat.status === 'Warning' ? 'Warning' : 'Near limit'}</span>
                           </span>
                         ) : (
                           <span className="text-[9px] sm:text-[10px] px-2 py-0.5 rounded-full bg-[#8fb39a]/15 text-[#8fb39a] font-bold border border-[#8fb39a]/30 flex items-center gap-1 shrink-0">
@@ -326,8 +350,9 @@ export default function BudgetPage() {
                         <button
                           type="button"
                           onClick={() => handleStartEdit(cat)}
+                          disabled={isActionPending(`cat-update-${cat.id}`) || isActionPending(`cat-del-${cat.id}`)}
                           title="Edit Category Name & Limit"
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer shrink-0 ${
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed ${
                             isDark
                               ? 'bg-[#0e0e10] border-[#26262b] text-[#8a8a93] hover:text-[#c9b27c] hover:border-[#c9b27c]'
                               : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#71717a] hover:text-[#c9b27c] hover:border-[#c9b27c]'
@@ -340,8 +365,9 @@ export default function BudgetPage() {
                         <button
                           type="button"
                           onClick={() => handleDeleteCategory(cat)}
+                          disabled={isActionPending(`cat-del-${cat.id}`)}
                           title="Delete Category"
-                          className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#d97070] hover:border-[#d97070]/40 transition-colors cursor-pointer shrink-0"
+                          className="p-1.5 rounded-lg border border-[#26262b] text-[#8a8a93] hover:text-[#d97070] hover:border-[#d97070]/40 transition-colors cursor-pointer shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -524,24 +550,90 @@ export default function BudgetPage() {
 
               {/* Color accent selector */}
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider mb-2 text-[#8a8a93]">
-                  Color Accent
-                </label>
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-[#8a8a93]">
+                    Color Accent
+                  </label>
+                  <span className="text-[11px] font-mono text-[#c9b27c] uppercase">
+                    {newCatColor}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
                   {COLOR_PALETTE.map((pal) => (
                     <button
                       key={pal.hex}
                       type="button"
                       onClick={() => setNewCatColor(pal.hex)}
                       className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
-                        newCatColor === pal.hex ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-neutral-900' : 'hover:scale-105'
+                        newCatColor.toLowerCase() === pal.hex.toLowerCase()
+                          ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-neutral-900'
+                          : 'hover:scale-105'
                       }`}
                       style={{ backgroundColor: pal.hex }}
                       title={pal.name}
                     >
-                      {newCatColor === pal.hex && <Check className="w-4 h-4 text-neutral-950 stroke-[3]" />}
+                      {newCatColor.toLowerCase() === pal.hex.toLowerCase() && (
+                        <Check className="w-4 h-4 text-neutral-950 stroke-[3]" />
+                      )}
                     </button>
                   ))}
+
+                  {/* Custom Color Palette Option */}
+                  <div className="relative flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => customColorInputRef.current?.click()}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform cursor-pointer relative overflow-hidden ${
+                        isCustomColor
+                          ? 'scale-110 ring-2 ring-white ring-offset-2 ring-offset-neutral-900 shadow-md'
+                          : 'hover:scale-105 ring-1 ring-[#3a3a40]'
+                      } ${
+                        isCustomColor
+                          ? ''
+                          : 'bg-[conic-gradient(at_center,_#ef4444,_#f59e0b,_#10b981,_#06b6d4,_#3b82f6,_#8b5cf6,_#ec4899,_#ef4444)]'
+                      }`}
+                      style={isCustomColor ? { backgroundColor: newCatColor } : undefined}
+                      title="Choose custom color palette..."
+                    >
+                      {isCustomColor ? (
+                        <Check className="w-4 h-4 text-white stroke-[3] drop-shadow" />
+                      ) : (
+                        <Pipette className="w-3.5 h-3.5 text-white drop-shadow stroke-[2.5]" />
+                      )}
+                    </button>
+
+                    {/* Native hidden color input that opens system color palette */}
+                    <input
+                      ref={customColorInputRef}
+                      type="color"
+                      value={newCatColor}
+                      onChange={(e) => setNewCatColor(e.target.value)}
+                      className="sr-only"
+                      aria-label="Pick custom color"
+                    />
+                  </div>
+
+                  {/* Hex quick edit */}
+                  <div className="flex items-center gap-1.5 ml-1">
+                    <input
+                      type="text"
+                      value={newCatColor}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setNewCatColor(val);
+                      }}
+                      placeholder="#c9b27c"
+                      maxLength={7}
+                      className={`w-20 h-8 px-2 rounded-lg border text-xs font-mono uppercase text-center outline-none focus:border-[#c9b27c] transition-colors ${
+                        isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
+                      }`}
+                      title="Enter hex code"
+                    />
+                    <span
+                      className="w-4 h-4 rounded-full border border-black/20 shrink-0"
+                      style={{ backgroundColor: newCatColor }}
+                    />
+                  </div>
                 </div>
               </div>
 

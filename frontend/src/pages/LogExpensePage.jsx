@@ -54,7 +54,6 @@ export default function LogExpensePage() {
     transactions,
     addExpense,
     availableCategories,
-    currentUser,
     setCurrentScreen,
   } = useFinance();
   const { isDark } = useTheme();
@@ -416,7 +415,6 @@ export default function LogExpensePage() {
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || '',
     };
 
     // ₹7,000 threshold check: triggers security authorization modal if exceeded
@@ -590,8 +588,6 @@ export default function LogExpensePage() {
                         <CategoryBadge category={tx.category} customColor={tx.categoryColor} />
                         <span>•</span>
                         <span>{tx.time || '12:00 PM'}</span>
-                        <span>•</span>
-                        <span className="font-mono text-[#c9b27c]">{tx.user}</span>
                       </p>
                     </div>
                   </div>

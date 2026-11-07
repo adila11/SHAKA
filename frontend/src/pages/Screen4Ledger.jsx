@@ -26,7 +26,7 @@ export default function Screen4Ledger({ customTheme = null, onNavigate }) {
             Ledger
           </h3>
           <p className={`text-[11px] ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            Synced across 3 members
+            Single shared ledger
           </p>
         </div>
         <div

@@ -102,7 +102,7 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
             </div>
             <button
               type="button"
-              onClick={toggleTheme}
+              onClick={(e) => toggleTheme(e)}
               className={`px-2.5 py-1 rounded-xl border text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isDark
                   ? 'bg-neutral-800 border-[#26262b] text-[#e8e8ea] hover:bg-neutral-700'

@@ -32,7 +32,7 @@ const toFormattedDates = (dateObj) => {
 };
 
 export default function AddExpenseModal() {
-  const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories, currentUser } = useFinance();
+  const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories } = useFinance();
   const { isDark } = useTheme();
 
   const [amount, setAmount] = useState('750');
@@ -164,7 +164,6 @@ export default function AddExpenseModal() {
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || '',
     };
 
     if (numAmount > 7000) {

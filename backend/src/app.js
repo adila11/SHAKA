@@ -7,6 +7,7 @@ import transactionRoutes from './routes/transactionRoutes.js';
 import budgetRoutes from './routes/budgetRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import householdRoutes from './routes/householdRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 import { isDbConnected } from './data/dbStore.js';
 
@@ -51,8 +52,10 @@ app.get('/api/health', (req, res) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/budget', budgetRoutes);
+app.use('/api/budget-categories', budgetRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/household', householdRoutes);
 

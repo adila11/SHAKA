@@ -7,11 +7,11 @@ const transactionSchema = new mongoose.Schema(
     fullDate: { type: String, required: true },
     time: { type: String, default: 'Just now' },
     category: { type: String, required: true },
+    categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'BudgetCategory' },
     categoryColor: { type: String, default: '#c9b27c' },
     description: { type: String, required: true },
     amount: { type: Number, required: true },
-    user: { type: String, required: true, default: 'abdulshamil' },
-    userRole: { type: String, default: 'Admin' },
+    type: { type: String, enum: ['expense', 'income'], default: 'expense', required: true },
     isSplit: { type: Boolean, default: true },
   },
   {
@@ -20,8 +20,9 @@ const transactionSchema = new mongoose.Schema(
 );
 
 transactionSchema.index({ category: 1 });
-transactionSchema.index({ user: 1 });
 transactionSchema.index({ createdAt: -1 });
+transactionSchema.index({ type: 1, category: 1, date: -1 });
+transactionSchema.index({ categoryId: 1 });
 
 export const Transaction = mongoose.model('Transaction', transactionSchema);
 

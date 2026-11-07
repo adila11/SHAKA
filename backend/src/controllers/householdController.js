@@ -25,32 +25,17 @@ export const getBalances = async (req, res, next) => {
     const users = await dbStore.users.find();
 
     const splitTxs = transactions.filter(t => t.isSplit);
-
-    const spentByMember = {};
-    users.forEach(u => {
-      spentByMember[u.username] = 0;
-    });
-
-    splitTxs.forEach(t => {
-      const userKey = t.user || users[0]?.username || 'abdulshamil';
-      spentByMember[userKey] = (spentByMember[userKey] || 0) + Number(t.amount || 0);
-    });
-
     const totalSplit = splitTxs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-    const memberCount = Object.keys(spentByMember).length || 1;
+    const memberCount = users.length || 1;
     const equalShare = Math.round(totalSplit / memberCount);
 
-    const balances = Object.keys(spentByMember).map(name => {
-      const paid = spentByMember[name];
-      const net = paid - equalShare;
-      return {
-        name,
-        paid,
-        equalShare,
-        net,
-        status: net >= 0 ? `Gets back ₹${net.toLocaleString('en-IN')}` : `Owes ₹${Math.abs(net).toLocaleString('en-IN')}`,
-      };
-    });
+    const balances = users.map(u => ({
+      name: u.username,
+      paid: 0,
+      equalShare,
+      net: 0,
+      status: `Equal shared split: ₹${equalShare.toLocaleString('en-IN')}`,
+    }));
 
     res.status(200).json({
       success: true,

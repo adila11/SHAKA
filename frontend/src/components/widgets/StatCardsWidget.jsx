@@ -4,12 +4,20 @@ import { formatCurrency } from '../../data/financeData';
 import { Skeleton } from '../common/Skeleton';
 
 export default function StatCardsWidget({ customTheme = null }) {
-  const { totalSpent, todaySpent, todayLogsCount, isLoading } = useFinance();
+  const {
+    totalSpent,
+    todaySpent,
+    todayLogsCount,
+    daysPassed,
+    daysRemaining,
+    shortMonth,
+    totalDaysInMonth,
+    isLoading,
+  } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  // Assuming 22 days passed in November
-  const avgPerDay = Math.round(totalSpent / 22);
+  const avgPerDay = daysPassed > 0 ? Math.round(totalSpent / daysPassed) : totalSpent;
 
   return (
     <div className="grid grid-cols-3 gap-1.5 sm:gap-2 min-w-0 max-w-full">
@@ -63,10 +71,10 @@ export default function StatCardsWidget({ customTheme = null }) {
           Days Left
         </span>
         <span className={`text-[11px] sm:text-xs md:text-sm font-black font-mono mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-          8 d
+          {daysRemaining} d
         </span>
         <span className={`text-[8px] sm:text-[9px] font-medium mt-0.5 truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-          Nov 30
+          {shortMonth} {totalDaysInMonth}
         </span>
       </div>
     </div>

@@ -90,3 +90,33 @@
   background-size: 200% 100%;
   animation: shimmerWave 1.8s ease-in-out infinite;
 }
+
+/* View Transitions API circular reveal rules */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 9999;
+}
+
+/* Fallback circular reveal overlay for browsers lacking View Transitions API */
+.theme-circular-ripple {
+  position: fixed;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 99999;
+  transform: translate(-50%, -50%) scale(0);
+  transition: transform 0.48s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+  will-change: transform, opacity;
+}
+
+.theme-circular-ripple.active {
+  transform: translate(-50%, -50%) scale(1);
+}

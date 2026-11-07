@@ -1,9 +1,15 @@
+import { Bell } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getProfileImageUrl } from '../../data/financeData';
 
 export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfileClick }) {
-  const { currentUser, navigateTo } = useFinance();
+  const {
+    currentUser,
+    navigateTo,
+    pendingAdminRequestsCount,
+    setIsReviewResetModalOpen,
+  } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -35,32 +41,54 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
         </div>
       </div>
 
-      <button
-        type="button"
-        onClick={handleAvatarClick}
-        className="flex items-center gap-2 cursor-pointer group"
-      >
-        <span
-          className={`text-xs font-medium transition-colors ${
-            isDark ? 'text-[#8a8a93] group-hover:text-[#e8e8ea]' : 'text-[#71717a] group-hover:text-[#18181b]'
-          }`}
+      <div className="flex items-center gap-2">
+        {currentUser?.role === 'Admin' && (
+          <button
+            type="button"
+            title={
+              pendingAdminRequestsCount > 0
+                ? `${pendingAdminRequestsCount} pending reset requests`
+                : 'No pending reset requests'
+            }
+            onClick={() => setIsReviewResetModalOpen(true)}
+            className="relative p-1.5 rounded-lg border border-[#26262b] bg-[#17171a] text-[#8a8a93] hover:text-[#e8e8ea] transition-colors cursor-pointer"
+          >
+            <Bell className="w-3.5 h-3.5 text-[#c9b27c]" />
+            {pendingAdminRequestsCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#d4a359] text-neutral-950 font-black text-[9px] flex items-center justify-center animate-pulse">
+                {pendingAdminRequestsCount}
+              </span>
+            )}
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={handleAvatarClick}
+          className="flex items-center gap-2 cursor-pointer group"
         >
-          {currentUser?.username || 'Member'}
-        </span>
-        <div
-          className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm overflow-hidden ${
-            isDark
-              ? 'bg-[#17171a] border-[#26262b] text-[#c9b27c] group-hover:border-[#c9b27c]'
-              : 'bg-white border-[#e5e3dc] text-[#c9b27c] group-hover:border-[#c9b27c]'
-          }`}
-        >
-          <img
-            src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
-            alt={currentUser?.username || 'User'}
-            className="w-full h-full object-cover"
-          />
-        </div>
-      </button>
+          <span
+            className={`text-xs font-medium transition-colors ${
+              isDark ? 'text-[#8a8a93] group-hover:text-[#e8e8ea]' : 'text-[#71717a] group-hover:text-[#18181b]'
+            }`}
+          >
+            {currentUser?.username || 'Member'}
+          </span>
+          <div
+            className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm overflow-hidden ${
+              isDark
+                ? 'bg-[#17171a] border-[#26262b] text-[#c9b27c] group-hover:border-[#c9b27c]'
+                : 'bg-white border-[#e5e3dc] text-[#c9b27c] group-hover:border-[#c9b27c]'
+            }`}
+          >
+            <img
+              src={getProfileImageUrl(currentUser?.profileImage || currentUser?.avatar)}
+              alt={currentUser?.username || 'User'}
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </button>
+      </div>
     </div>
   );
 }

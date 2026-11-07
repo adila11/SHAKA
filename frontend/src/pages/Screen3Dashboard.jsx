@@ -4,9 +4,11 @@ import MonthlyLimitWidget from '../components/widgets/MonthlyLimitWidget';
 import DonutSpendWidget from '../components/widgets/DonutSpendWidget';
 import StatCardsWidget from '../components/widgets/StatCardsWidget';
 import ProjectedSpendWidget from '../components/widgets/ProjectedSpendWidget';
+import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 
 export default function Screen3Dashboard({ customTheme = null, onNavigate }) {
+  const { monthName, currentYear } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -21,7 +23,7 @@ export default function Screen3Dashboard({ customTheme = null, onNavigate }) {
         <div className="flex items-center justify-between">
           <div>
             <p className={`text-[11px] font-medium uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-              November 2026
+              {monthName} {currentYear}
             </p>
             <h3 className={`text-base font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
               Shared Overview

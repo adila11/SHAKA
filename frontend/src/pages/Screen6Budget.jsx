@@ -83,14 +83,14 @@ export default function Screen6Budget({ customTheme = null, onNavigate }) {
                     {cat.name}
                   </span>
                   <div className="flex items-center gap-1.5">
-                    {cat.status === 'Limit reached' && (
+                    {(cat.status === 'Limit reached' || cat.status === 'Exceeded') && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d97070]/20 text-[#d97070] font-bold">
-                        Limit reached
+                        {cat.status === 'Exceeded' ? 'Exceeded' : 'Limit reached'}
                       </span>
                     )}
-                    {cat.status === 'Near limit' && (
+                    {(cat.status === 'Near limit' || cat.status === 'Warning') && (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#d4a359]/20 text-[#d4a359] font-bold">
-                        Near limit
+                        {cat.status === 'Warning' ? 'Warning' : 'Near limit'}
                       </span>
                     )}
                     <span

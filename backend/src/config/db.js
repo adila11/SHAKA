@@ -3,7 +3,6 @@ import { config } from './index.js';
 import { User } from '../models/User.js';
 import { Transaction } from '../models/Transaction.js';
 import { BudgetCategory } from '../models/BudgetCategory.js';
-import { Setting } from '../models/Setting.js';
 import { INITIAL_DATA } from '../data/initialData.js';
 
 // Prevent Mongoose from buffering queries when disconnected
@@ -18,28 +17,75 @@ export const seedDatabase = async () => {
       await User.deleteMany({});
       await User.insertMany(INITIAL_DATA.users);
       console.log('✅ Users configured: abdulshamil, adilaka');
+    } else {
+      // Ensure both configured accounts have Admin role
+      await User.updateMany(
+        { username: { $in: ['abdulshamil', 'adilaka'] } },
+        { $set: { role: 'Admin' } }
+      );
     }
 
     const txCount = await Transaction.countDocuments();
     if (txCount === 0) {
       console.log('🌱 Seeding initial transactions into MongoDB...');
       await Transaction.insertMany(INITIAL_DATA.transactions);
+    } else {
+      // Migration: Ensure all existing transactions have type ('expense' default)
+      await Transaction.updateMany(
+        { type: { $exists: false } },
+        { $set: { type: 'expense' } }
+      );
+
+      // Migration: Remove user-related fields from all transactions
+      await Transaction.updateMany(
+        {},
+        {
+          $unset: {
+            user: '',
+            userRole: '',
+            userId: '',
+            createdBy: '',
+            updatedBy: '',
+          },
+        }
+      );
+
+      try {
+        await Transaction.collection.dropIndex('user_1');
+      } catch {
+        // Index may not exist or already dropped
+      }
     }
 
     const catCount = await BudgetCategory.countDocuments();
     if (catCount === 0) {
       console.log('🌱 Seeding initial budget categories into MongoDB...');
       await BudgetCategory.insertMany(INITIAL_DATA.budgetCategories);
+    } else {
+      // Migration: Unset obsolete stored spent, status, statusColor from BudgetCategory
+      await BudgetCategory.updateMany(
+        {},
+        { $unset: { spent: '', status: '', statusColor: '' } }
+      );
     }
 
-    const setting = await Setting.findOne({ key: 'global' });
-    if (!setting) {
-      console.log('🌱 Seeding initial settings into MongoDB...');
-      await Setting.create({
-        key: 'global',
-        monthlyLimit: INITIAL_DATA.monthlyLimit,
-        availableCategories: INITIAL_DATA.availableCategories,
-      });
+    // Migration: Link categoryId on existing transactions
+    const existingCats = await BudgetCategory.find().lean();
+    for (const cat of existingCats) {
+      await Transaction.updateMany(
+        { category: new RegExp(`^${cat.category}$`, 'i'), categoryId: { $exists: false } },
+        { $set: { categoryId: cat._id } }
+      );
+    }
+
+    // Drop obsolete settings collection if present
+    try {
+      if (mongoose.connection?.db) {
+        await mongoose.connection.db.dropCollection('settings');
+        console.log('🧹 Obsolete settings collection dropped');
+      }
+    } catch {
+      // Collection may not exist, safe to ignore
     }
 
     console.log('✅ MongoDB database seeded and ready');

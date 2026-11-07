@@ -42,11 +42,16 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
       </button>
 
       <div className="mb-8">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#c9b27c]/15 text-[#c9b27c] border border-[#c9b27c]/30 font-bold uppercase tracking-wider">
+            Two-Admin Approval
+          </span>
+        </div>
         <h2 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-          Forgot Password
+          Admin Password Recovery
         </h2>
         <p className={`text-xs mt-2 leading-relaxed ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-          Enter your registered username below. We&apos;ll verify your multi-user account and generate a secure reset link.
+          Enter your registered administrator email. The second administrator must review and approve your request before resetting.
         </p>
       </div>
 
@@ -57,11 +62,11 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
               isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'
             }`}
           >
-            Username
+            Registered Admin Email
           </label>
           <div className="relative">
             <input
-              type="text"
+              type="email"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className={`w-full h-12 px-4 rounded-xl border text-sm focus:outline-none focus:border-[#c9b27c] transition-colors ${
@@ -69,7 +74,7 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
                   ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-white border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="Username"
+              placeholder="admin@shaka.local"
             />
             <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
               <Mail className="w-4 h-4" />

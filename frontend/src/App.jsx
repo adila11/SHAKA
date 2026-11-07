@@ -1,8 +1,12 @@
 import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route } from './router/BrowserRouter';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
 import ResponsiveLayout from './components/layout/ResponsiveLayout';
 import AccessCodePromptModal from './components/modals/AccessCodePromptModal';
+import AdminPasswordResetApprovalModal from './components/modals/AdminPasswordResetApprovalModal';
 import {
   AuthInitializingScreen,
   ServerUnavailableScreen,
@@ -83,7 +87,12 @@ function PublicRoute({ children }) {
 }
 
 function PageRouter() {
-  const { currentScreen, viewMode, setViewMode } = useFinance();
+  const {
+    viewMode,
+    setViewMode,
+    isReviewResetModalOpen,
+    setIsReviewResetModalOpen,
+  } = useFinance();
 
   // If user explicitly switched to the Stitch Phone Gallery Showcase
   if (viewMode === 'all') {
@@ -109,77 +118,125 @@ function PageRouter() {
     );
   }
 
-  // Proper responsive page layout with protected & public route enforcement
-  const renderCurrentPage = () => {
-    switch (currentScreen) {
-      case 'dashboard':
-        return (
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        );
-      case 'ledger':
-        return (
-          <ProtectedRoute>
-            <LedgerPage />
-          </ProtectedRoute>
-        );
-      case 'add-expense':
-      case 'log-expense':
-        return (
-          <ProtectedRoute>
-            <LogExpensePage />
-          </ProtectedRoute>
-        );
-      case 'budget':
-        return (
-          <ProtectedRoute>
-            <BudgetPage />
-          </ProtectedRoute>
-        );
-      case 'profile':
-        return (
-          <ProtectedRoute>
-            <ProfilePage />
-          </ProtectedRoute>
-        );
-      case 'signup':
-      case 'register':
-      case 'login':
-        return (
-          <PublicRoute>
-            <LoginPage />
-          </PublicRoute>
-        );
-      case 'forgot':
-        return <ForgotPasswordPage />;
-      case 'change-pass':
-        return <ChangePasswordPage />;
-      default:
-        return (
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        );
-    }
-  };
-
   return (
     <ResponsiveLayout>
       <Suspense fallback={<PageLoadingFallback />}>
-        {renderCurrentPage()}
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/ledger"
+            element={
+              <ProtectedRoute>
+                <LedgerPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/add-expense"
+            element={
+              <ProtectedRoute>
+                <LogExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/log-expense"
+            element={
+              <ProtectedRoute>
+                <LogExpensePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/budget"
+            element={
+              <ProtectedRoute>
+                <BudgetPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <ProfilePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/signup"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <LoginPage />
+              </PublicRoute>
+            }
+          />
+          <Route path="/forgot" element={<ForgotPasswordPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/change-pass" element={<ChangePasswordPage />} />
+          <Route path="/change-password" element={<ChangePasswordPage />} />
+          <Route
+            path="*"
+            element={
+              <ProtectedRoute>
+                <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
       </Suspense>
       <AccessCodePromptModal />
+      <AdminPasswordResetApprovalModal
+        isOpen={isReviewResetModalOpen}
+        onClose={() => setIsReviewResetModalOpen(false)}
+      />
     </ResponsiveLayout>
   );
 }
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <FinanceProvider>
-        <PageRouter />
-      </FinanceProvider>
-    </ThemeProvider>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <ThemeProvider>
+          <ToastProvider>
+            <FinanceProvider>
+              <PageRouter />
+            </FinanceProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

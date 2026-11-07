@@ -5,7 +5,8 @@ import {
   User,
   Plus,
   Moon,
-  Sun
+  Sun,
+  Bell,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -17,8 +18,10 @@ export default function Navbar() {
     setCurrentScreen,
     currentUser,
     isLoggedIn,
+    pendingAdminRequestsCount,
+    setIsReviewResetModalOpen,
   } = useFinance();
-  const { setTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
 
   const navLinks = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -99,11 +102,32 @@ export default function Navbar() {
             </button>
           )}
 
+          {/* Admin Password Reset Approval Notification Badge */}
+          {isLoggedIn && currentUser?.role === 'Admin' && (
+            <button
+              type="button"
+              title={
+                pendingAdminRequestsCount > 0
+                  ? `${pendingAdminRequestsCount} pending password reset request awaiting your approval`
+                  : 'No pending reset requests'
+              }
+              onClick={() => setIsReviewResetModalOpen(true)}
+              className="relative p-2 rounded-xl border border-[#26262b] bg-[#17171a] text-[#8a8a93] hover:text-[#e8e8ea] hover:border-[#c9b27c]/40 transition-colors cursor-pointer"
+            >
+              <Bell className="w-4 h-4 text-[#c9b27c]" />
+              {pendingAdminRequestsCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#d4a359] text-neutral-950 font-black text-[10px] flex items-center justify-center animate-pulse shadow-sm">
+                  {pendingAdminRequestsCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Theme switcher */}
           <button
             type="button"
             title={`Switch to ${isDark ? 'Light' : 'Dark'} mode`}
-            onClick={() => setTheme(isDark ? 'light' : 'dark')}
+            onClick={(e) => toggleTheme(e)}
             className="p-2 rounded-xl border border-[#26262b] bg-[#17171a] text-[#8a8a93] hover:text-[#e8e8ea] hover:border-[#c9b27c]/40 transition-colors cursor-pointer"
           >
             {isDark ? <Sun className="w-4 h-4 text-[#c9b27c]" /> : <Moon className="w-4 h-4 text-[#c9b27c]" />}

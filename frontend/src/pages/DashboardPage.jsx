@@ -1,4 +1,4 @@
-import { ArrowRight, Plus, Calendar, ShieldCheck } from 'lucide-react';
+import { ArrowRight, Plus, Calendar, ShieldCheck, ShieldAlert, UserCheck } from 'lucide-react';
 import MonthlyLimitWidget from '../components/widgets/MonthlyLimitWidget';
 import DonutSpendWidget from '../components/widgets/DonutSpendWidget';
 import StatCardsWidget from '../components/widgets/StatCardsWidget';
@@ -14,11 +14,17 @@ export default function DashboardPage() {
   const {
     currentUser,
     transactions,
+    budgetCategories,
     totalSpent,
     monthlyLimit,
+    daysPassed,
     householdMembers,
     setCurrentScreen,
     isLoading,
+    pendingAdminRequests,
+    pendingAdminRequestsCount,
+    setIsReviewResetModalOpen,
+    setSelectedResetRequest,
   } = useFinance();
   const { isDark } = useTheme();
 
@@ -76,6 +82,51 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Admin Password Reset Approval Notification Banner */}
+      {currentUser?.role === 'Admin' && pendingAdminRequestsCount > 0 && (
+        <div
+          className={`p-4 sm:p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all animate-in fade-in duration-300 shadow-sm ${
+            isDark
+              ? 'bg-[#d4a359]/10 border-[#d4a359]/30 text-[#e8e8ea]'
+              : 'bg-[#fdfaf2] border-[#d4a359]/40 text-[#18181b]'
+          }`}
+        >
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-[#d4a359]/20 text-[#d4a359] flex items-center justify-center shrink-0 mt-0.5">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm font-bold tracking-tight text-[#d4a359]">
+                  Password Reset Request Awaiting Your Approval
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-[#d4a359] text-neutral-950 font-black text-[10px] uppercase tracking-wider">
+                  {pendingAdminRequestsCount} Pending
+                </span>
+              </div>
+              <p className={`text-xs mt-1 leading-relaxed ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                Administrator{' '}
+                <span className="font-bold text-[#c9b27c] font-mono">
+                  {pendingAdminRequests[0]?.requestingAdminUsername}
+                </span>{' '}
+                ({pendingAdminRequests[0]?.requestingAdminEmail}) requested permission to reset their account password.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setSelectedResetRequest(pendingAdminRequests[0]);
+              setIsReviewResetModalOpen(true);
+            }}
+            className="shrink-0 px-4 py-2.5 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+          >
+            <UserCheck className="w-4 h-4" />
+            <span>Review & Respond</span>
+          </button>
+        </div>
+      )}
 
       {/* Top 4 Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0 max-w-full">
@@ -137,9 +188,9 @@ export default function DashboardPage() {
           </span>
           <div
             className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}
-            title={formatCurrency(Math.round(totalSpent / 22))}
+            title={formatCurrency(daysPassed > 0 ? Math.round(totalSpent / daysPassed) : totalSpent)}
           >
-            {isLoading ? <Skeleton className="h-6 sm:h-7 w-20 sm:w-28 my-1" /> : formatCurrency(Math.round(totalSpent / 22))}
+            {isLoading ? <Skeleton className="h-6 sm:h-7 w-20 sm:w-28 my-1" /> : formatCurrency(daysPassed > 0 ? Math.round(totalSpent / daysPassed) : totalSpent)}
           </div>
           <span className="text-[10px] sm:text-[11px] font-semibold text-[#8fb39a] mt-1 truncate block">
             Normalized pace
@@ -265,7 +316,7 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {/* Quick Category Health Widget */}
+          {/* Quick Category Widget */}
           <div
             className={`p-5 rounded-2xl border transition-colors shadow-sm ${
               isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
@@ -273,7 +324,7 @@ export default function DashboardPage() {
           >
             <div className="flex items-center justify-between mb-3">
               <span className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                Category Health
+                Category
               </span>
               <button
                 type="button"
@@ -285,35 +336,70 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className={isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}>Food & Groceries</span>
-                  <span className="text-[#d4a359] font-bold font-mono">85%</span>
+              {isLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <Skeleton className="w-28 h-3.5 rounded" />
+                      <Skeleton className="w-12 h-3.5 rounded" />
+                    </div>
+                    <Skeleton className="w-full h-1.5 rounded-full" />
+                  </div>
+                ))
+              ) : budgetCategories.length === 0 ? (
+                <div className="py-4 text-center text-xs text-[#8a8a93]">
+                  No categories configured yet.
                 </div>
-                <div className="w-full h-1.5 rounded-full bg-[#26262b] overflow-hidden">
-                  <div className="h-full rounded-full bg-[#d4a359]" style={{ width: '85%' }} />
-                </div>
-              </div>
+              ) : (
+                budgetCategories.map((cat) => {
+                  const spent = Number(cat.spent || 0);
+                  const limit = Number(cat.limit || 0);
+                  const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+                  const isExceeded = percent > 100 || cat.status === 'Exceeded' || cat.status === 'Limit reached';
+                  const isWarning = !isExceeded && (percent >= 80 || cat.status === 'Warning' || cat.status === 'Near limit');
 
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className={isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}>Rent & Maintenance</span>
-                  <span className="text-[#8fb39a] font-bold font-mono">52%</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-[#26262b] overflow-hidden">
-                  <div className="h-full rounded-full bg-[#8fb39a]" style={{ width: '52%' }} />
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-xs font-medium mb-1">
-                  <span className={isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}>Bills & Utilities</span>
-                  <span className="text-[#d97070] font-bold font-mono">104% (Exceeded)</span>
-                </div>
-                <div className="w-full h-1.5 rounded-full bg-[#26262b] overflow-hidden">
-                  <div className="h-full rounded-full bg-[#d97070]" style={{ width: '100%' }} />
-                </div>
-              </div>
+                  return (
+                    <div key={cat.id || cat.name}>
+                      <div className="flex justify-between text-xs font-medium mb-1 items-baseline min-w-0">
+                        <span className={`truncate mr-2 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                          {cat.name}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0 font-mono">
+                          <span
+                            className={`font-bold ${
+                              isExceeded
+                                ? 'text-[#d97070]'
+                                : isWarning
+                                ? 'text-[#d4a359]'
+                                : 'text-[#8fb39a]'
+                            }`}
+                          >
+                            {percent}%{isExceeded ? ' (Exceeded)' : ''}
+                          </span>
+                          <span className={`text-[10px] ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                            ({formatCurrency(spent)} / {formatCurrency(limit)})
+                          </span>
+                        </div>
+                      </div>
+                      <div className={`w-full h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-[#26262b]' : 'bg-[#e5e3dc]'}`}>
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isExceeded
+                              ? 'bg-[#d97070]'
+                              : isWarning
+                              ? 'bg-[#d4a359]'
+                              : ''
+                          }`}
+                          style={{
+                            width: `${Math.min(100, percent)}%`,
+                            backgroundColor: !isExceeded && !isWarning ? (cat.color || '#8fb39a') : undefined,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           </div>
         </div>

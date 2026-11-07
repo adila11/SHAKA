@@ -17,7 +17,6 @@ export default function LedgerPage() {
   const filteredTransactions = transactions.filter((tx) => {
     const matchesSearch =
       tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
       tx.category.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || tx.category.toLowerCase() === selectedCategory.toLowerCase();
     return matchesSearch && matchesCategory;

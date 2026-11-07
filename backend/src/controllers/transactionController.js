@@ -40,7 +40,7 @@ const getCategoryColor = (category) => {
  */
 export const authorizeExpense = async (req, res, next) => {
   try {
-    const { amount, credential, credentialType = 'accessCode', user = 'abdulshamil' } = req.body;
+    const { amount, credential, credentialType = 'accessCode' } = req.body;
 
     const numAmount = Number(amount);
     if (isNaN(numAmount) || numAmount <= 7000) {
@@ -59,7 +59,7 @@ export const authorizeExpense = async (req, res, next) => {
       });
     }
 
-    const trimmedUser = req.user?.username || String(user || 'abdulshamil').trim();
+    const trimmedUser = req.user?.username;
     const targetUser = await dbStore.users.findByUsername(trimmedUser);
     if (!targetUser) {
       return res.status(404).json({
@@ -176,12 +176,12 @@ export const authorizeExpense = async (req, res, next) => {
 
 export const getTransactions = async (req, res, next) => {
   try {
-    const { category, search, user, isSplit, limit, offset } = req.query;
+    const { category, search, type, isSplit, limit, offset } = req.query;
 
     const filter = {
       category,
       search,
-      user,
+      type,
       isSplit: isSplit !== undefined ? isSplit === 'true' : undefined,
     };
 
@@ -223,8 +223,6 @@ export const createTransaction = async (req, res, next) => {
       description = 'New expense',
       date = 'Nov 22',
       time = 'Just now',
-      user = 'abdulshamil',
-      userRole = 'Admin',
       isSplit = true,
       authorizationToken,
     } = req.body;
@@ -277,11 +275,11 @@ export const createTransaction = async (req, res, next) => {
         });
       }
 
-      // Ensure user matches
-      if (decoded.username?.toLowerCase() !== String(user).toLowerCase()) {
+      // Ensure authorizing user matches authenticated session
+      if (decoded.username?.toLowerCase() !== req.user?.username?.toLowerCase()) {
         return res.status(403).json({
           success: false,
-          message: 'Authorization token does not belong to this user.',
+          message: 'Authorization token does not belong to this user session.',
         });
       }
 
@@ -338,17 +336,6 @@ export const createTransaction = async (req, res, next) => {
 
     const nowIso = new Date().toISOString();
 
-    // Enforce authenticated identity: normal users can only log for themselves; admins may log for household members
-    const authUsername = req.user?.username || 'abdulshamil';
-    const authRole = req.user?.role || 'Member';
-    let assignedUser = authUsername;
-    let assignedRole = authRole;
-
-    if (authRole === 'Admin' && req.body.user) {
-      assignedUser = String(req.body.user).trim();
-      assignedRole = req.body.userRole || 'Member';
-    }
-
     const newTx = {
       id: `tx-${Date.now()}`,
       date,
@@ -358,15 +345,13 @@ export const createTransaction = async (req, res, next) => {
       categoryColor: getCategoryColor(trimmedCategory),
       description: trimmedDesc,
       amount: numAmount,
-      user: assignedUser,
-      userRole: assignedRole,
       isSplit: Boolean(isSplit),
+      type: req.body.type === 'income' ? 'income' : 'expense',
       createdAt: nowIso,
       updatedAt: nowIso,
     };
 
     await dbStore.transactions.create(newTx);
-    await dbStore.budget.updateSpent(trimmedCategory, numAmount);
 
     res.status(201).json({
       success: true,
@@ -387,13 +372,12 @@ export const updateTransaction = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
 
-    // Authorization & Ownership check: Admin or the owner
-    const isOwner = existing.user?.toLowerCase() === req.user?.username?.toLowerCase();
+    // Authorization check: Admin permissions required for ledger modifications
     const isAdmin = req.user?.role === 'Admin';
-    if (!isOwner && !isAdmin) {
+    if (!isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: You do not have permission to modify this transaction.',
+        message: 'Access denied: Administrator permissions required to modify transactions.',
         errorCode: 'FORBIDDEN',
       });
     }
@@ -419,18 +403,17 @@ export const deleteTransaction = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Transaction not found' });
     }
 
-    // Authorization & Ownership check: Admin or the owner
-    const isOwner = existing.user?.toLowerCase() === req.user?.username?.toLowerCase();
+    // Authorization check: Admin permissions required for ledger deletions
     const isAdmin = req.user?.role === 'Admin';
-    if (!isOwner && !isAdmin) {
+    if (!isAdmin) {
       return res.status(403).json({
         success: false,
-        message: 'Access denied: You do not have permission to delete this transaction.',
+        message: 'Access denied: Administrator permissions required to delete transactions.',
         errorCode: 'FORBIDDEN',
       });
     }
 
-    const success = await dbStore.transactions.delete(id);
+    await dbStore.transactions.delete(id);
 
     res.status(200).json({
       success: true,

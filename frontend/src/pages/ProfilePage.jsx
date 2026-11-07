@@ -16,7 +16,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Pencil
+  Pencil,
+  UserCheck,
+  Clock,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
@@ -36,8 +38,13 @@ export default function ProfilePage() {
     disableAccessCode,
     resetAccessCode,
     updateProfile,
+    pendingAdminRequests,
+    adminRequestsHistory,
+    fetchPendingAdminRequests,
+    setIsReviewResetModalOpen,
+    setSelectedResetRequest,
   } = useFinance();
-  const { isDark, setTheme } = useTheme();
+  const { isDark, toggleTheme } = useTheme();
 
   // Modal dialog states: null | 'enable' | 'change' | 'disable' | 'view_reset'
   const [modalType, setModalType] = useState(null);
@@ -545,6 +552,123 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* Section 2.5: Admin Password Reset Approval Requests (Visible for Admins) */}
+          {currentUser?.role === 'Admin' && (
+            <div
+              className={`p-5 rounded-2xl border transition-colors shadow-sm ${
+                isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Password Reset Requests
+                  </h4>
+                  {pendingAdminRequests.length > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-[#d4a359] text-neutral-950 font-black text-[10px] uppercase">
+                      {pendingAdminRequests.length} Pending
+                    </span>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={fetchPendingAdminRequests}
+                  title="Refresh requests"
+                  className="p-1 rounded-lg text-[#8a8a93] hover:text-[#c9b27c] transition-colors cursor-pointer"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              {pendingAdminRequests.length === 0 && (!adminRequestsHistory || adminRequestsHistory.length === 0) ? (
+                <div
+                  className={`p-4 rounded-xl border text-center text-xs ${
+                    isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#8a8a93]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#71717a]'
+                  }`}
+                >
+                  No pending password reset requests awaiting your approval.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Pending Requests */}
+                  {pendingAdminRequests.map((req) => (
+                    <div
+                      key={req.id || req._id}
+                      className={`p-4 rounded-xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                        isDark ? 'bg-[#0e0e10] border-[#d4a359]/30' : 'bg-[#fdfaf2] border-[#d4a359]/40'
+                      }`}
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                            {req.requestingAdminUsername}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-[#d4a359]/20 text-[#d4a359] border border-[#d4a359]/30">
+                            Pending
+                          </span>
+                        </div>
+                        <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                          {req.requestingAdminEmail}
+                        </p>
+                        <p className="text-[11px] text-[#8a8a93] mt-1 flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#c9b27c]" />
+                          <span>
+                            {req.createdAt
+                              ? new Date(req.createdAt).toLocaleString('en-US', {
+                                  dateStyle: 'medium',
+                                  timeStyle: 'short',
+                                })
+                              : 'Recent'}
+                          </span>
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedResetRequest(req);
+                          setIsReviewResetModalOpen(true);
+                        }}
+                        className="px-3.5 py-2 rounded-xl bg-[#c9b27c] hover:bg-[#bba46e] text-neutral-950 font-bold text-xs shadow-sm flex items-center gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <UserCheck className="w-3.5 h-3.5" />
+                        <span>Review</span>
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Previous Processed History (Audit Log) */}
+                  {adminRequestsHistory?.filter(h => h.status !== 'pending')?.slice(0, 3)?.map((h) => (
+                    <div
+                      key={h.id || h._id}
+                      className={`p-3 rounded-xl border flex items-center justify-between text-xs opacity-75 ${
+                        isDark ? 'bg-[#0e0e10]/60 border-[#26262b]' : 'bg-[#f6f5f2]/60 border-[#e5e3dc]'
+                      }`}
+                    >
+                      <div>
+                        <span className="font-mono font-semibold">{h.requestingAdminUsername}</span>
+                        <span className="text-[11px] text-[#8a8a93] ml-2">
+                          {h.createdAt ? new Date(h.createdAt).toLocaleDateString() : ''}
+                        </span>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                          h.status === 'completed' || h.status === 'approved'
+                            ? 'bg-[#8fb39a]/15 text-[#8fb39a] border border-[#8fb39a]/30'
+                            : h.status === 'rejected'
+                            ? 'bg-[#d97070]/15 text-[#d97070] border border-[#d97070]/30'
+                            : 'bg-neutral-500/15 text-neutral-400 border border-neutral-500/30'
+                        }`}
+                      >
+                        {h.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Section 3: Preferences & Theme */}
           <div
             className={`p-5 rounded-2xl border transition-colors shadow-sm ${
@@ -564,7 +688,7 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setTheme('dark')}
+                    onClick={(e) => toggleTheme(e, 'dark')}
                     className={`p-4 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
                       isDark
                         ? 'bg-[#0e0e10] border-[#c9b27c] ring-1 ring-[#c9b27c]'
@@ -580,7 +704,7 @@ export default function ProfilePage() {
 
                   <button
                     type="button"
-                    onClick={() => setTheme('light')}
+                    onClick={(e) => toggleTheme(e, 'light')}
                     className={`p-4 rounded-xl border flex items-center gap-3 cursor-pointer transition-all ${
                       !isDark
                         ? 'bg-white border-[#c9b27c] ring-1 ring-[#c9b27c]'

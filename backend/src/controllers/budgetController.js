@@ -29,32 +29,21 @@ export const addBudgetCategory = async (req, res, next) => {
     const catColor = color || '#c9b27c';
     const newId = `cat-${Date.now()}`;
 
-    const txs = await dbStore.transactions.find({ category: trimmedName });
-    const existingSpent = txs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
-
-    const status =
-      existingSpent > limitVal ? 'Limit reached' : existingSpent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
-    const statusColor =
-      status === 'Limit reached' ? '#d97070' : status === 'Near limit' ? '#d4a359' : '#8fb39a';
-
     const newCategory = {
       id: newId,
       name: trimmedName,
       category: trimmedName,
-      spent: existingSpent,
       limit: limitVal,
       color: catColor,
-      status,
-      statusColor,
     };
 
-    await dbStore.budget.addCategory(newCategory);
+    const created = await dbStore.budget.addCategory(newCategory);
     await dbStore.budget.addAvailableCategory({ name: trimmedName, color: catColor });
 
     res.status(201).json({
       success: true,
       message: 'Budget category created successfully',
-      data: newCategory,
+      data: created,
     });
   } catch (error) {
     next(error);
@@ -78,18 +67,11 @@ export const updateBudgetCategory = async (req, res, next) => {
       limit !== undefined && !isNaN(limit) && Number(limit) > 0 ? Number(limit) : existing.limit;
     const catColor = color || existing.color;
 
-    const status =
-      existing.spent > limitVal ? 'Limit reached' : existing.spent >= limitVal * 0.85 ? 'Near limit' : 'Healthy';
-    const statusColor =
-      status === 'Limit reached' ? '#d97070' : status === 'Near limit' ? '#d4a359' : '#8fb39a';
-
     const updates = {
       name: updatedName,
       category: updatedName,
       limit: limitVal,
       color: catColor,
-      status,
-      statusColor,
     };
 
     const updated = await dbStore.budget.updateCategory(id, updates);
@@ -133,22 +115,11 @@ export const getMonthlyLimit = async (req, res, next) => {
 
 export const updateMonthlyLimit = async (req, res, next) => {
   try {
-    const { monthlyLimit } = req.body;
-    const num = Number(monthlyLimit);
-
-    if (isNaN(num) || num <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Valid positive monthly limit is required',
-      });
-    }
-
-    await dbStore.budget.updateMonthlyLimit(num);
-
+    const totalLimit = await dbStore.budget.getMonthlyLimit();
     res.status(200).json({
       success: true,
-      message: 'Monthly limit updated successfully',
-      monthlyLimit: num,
+      message: 'Monthly limit is dynamically derived from all category limits combined',
+      monthlyLimit: totalLimit,
     });
   } catch (error) {
     next(error);

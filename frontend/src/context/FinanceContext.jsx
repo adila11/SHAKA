@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { api, setAuthEventHandlers } from '../services/api';
 import { DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData';
+import { pathToScreen, screenToPath, LOCATION_CHANGE_EVENT } from '../router/routerUtils';
+import { useToast } from './ToastContext';
+import { parseApiError } from '../utils/errorHandler';
 
 const FinanceContext = createContext();
 
@@ -44,28 +47,51 @@ export function FinanceProvider({ children }) {
   });
   const [currentUser, setCurrentUser] = useState(null);
 
+  // HTML5 History API Browser Routing state & synchronization
   const [currentScreen, setCurrentScreenState] = useState(() => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const h = window.location.hash.replace('#', '').trim();
-      if (h) return h;
+    if (typeof window !== 'undefined') {
+      // Migrate legacy hash if a user visits e.g. /#profile
+      if (window.location.hash && window.location.hash.length > 1) {
+        const hashPath = window.location.hash.replace(/^#\/?/, '/');
+        window.history.replaceState(null, '', hashPath);
+        return pathToScreen(hashPath);
+      }
+      return pathToScreen(window.location.pathname);
     }
     return 'dashboard';
   });
 
-  const setCurrentScreen = useCallback((screen) => {
+  const setCurrentScreen = useCallback((screenOrPath, options = {}) => {
+    const screen = pathToScreen(screenOrPath);
     setCurrentScreenState(screen);
+
     if (typeof window !== 'undefined') {
-      window.location.hash = screen;
+      const targetPath = screenToPath(screenOrPath);
+      const currentPath = window.location.pathname;
+
+      if (currentPath !== targetPath && !(currentPath === '/' && targetPath === '/dashboard')) {
+        if (options.replace) {
+          window.history.replaceState(null, '', targetPath);
+        } else {
+          window.history.pushState(null, '', targetPath);
+        }
+      }
     }
   }, []);
 
+  // Synchronize state with browser Back/Forward (popstate) and programmatic navigation
   useEffect(() => {
-    const onHashChange = () => {
-      const h = window.location.hash.replace('#', '').trim();
-      if (h) setCurrentScreenState(h);
+    const onLocationChange = () => {
+      const screen = pathToScreen(window.location.pathname);
+      setCurrentScreenState(screen);
     };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
+
+    window.addEventListener('popstate', onLocationChange);
+    window.addEventListener(LOCATION_CHANGE_EVENT, onLocationChange);
+    return () => {
+      window.removeEventListener('popstate', onLocationChange);
+      window.removeEventListener(LOCATION_CHANGE_EVENT, onLocationChange);
+    };
   }, []);
 
   const [viewMode, setViewMode] = useState('page'); // 'page' | 'all' | 'single'
@@ -83,15 +109,27 @@ export function FinanceProvider({ children }) {
   const [transactions, setTransactions] = useState([]);
   const [budgetCategories, setBudgetCategories] = useState([]);
   const [availableCategories, setAvailableCategories] = useState(DEFAULT_AVAILABLE_CATEGORIES);
-  const [monthlyLimit, setMonthlyLimitState] = useState(0);
+  const [monthlyLimitState, setMonthlyLimitState] = useState(0);
 
   const [householdMembers, setHouseholdMembers] = useState([]);
   const [householdBalances, setHouseholdBalances] = useState(null);
+
+  // Admin Two-Admin Password Reset Approval System State
+  const [pendingAdminRequests, setPendingAdminRequests] = useState([]);
+  const [adminRequestsHistory, setAdminRequestsHistory] = useState([]);
+  const [isReviewResetModalOpen, setIsReviewResetModalOpen] = useState(false);
+  const [selectedResetRequest, setSelectedResetRequest] = useState(null);
 
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isBackendConnected, setIsBackendConnected] = useState(null);
   const [error, setError] = useState(null);
+  const [pendingActionIds, setPendingActionIds] = useState(() => new Set());
+  const toast = useToast();
+
+  const isActionPending = useCallback((key) => {
+    return pendingActionIds.has(key);
+  }, [pendingActionIds]);
 
   const isFetchingRef = useRef(false);
   const isHealthCheckingRef = useRef(false);
@@ -334,7 +372,7 @@ export function FinanceProvider({ children }) {
     }
   }, []);
 
-  // Background health check & window visibility / network status handlers
+  // Background health check & shared ledger real-time automatic synchronization
   useEffect(() => {
     const onOnline = () => {
       checkHealth();
@@ -343,19 +381,92 @@ export function FinanceProvider({ children }) {
 
     const onFocus = () => {
       checkHealth();
+      if (isLoggedIn) {
+        refreshData({ showLoading: false });
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isLoggedIn) {
+        refreshData({ showLoading: false });
+      }
     };
 
     window.addEventListener('online', onOnline);
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
-    const interval = setInterval(checkHealth, 25000); // 25-second gentle check
+    // Active ledger synchronization polling every 5 seconds across connected clients
+    const pollInterval = isLoggedIn
+      ? setInterval(() => {
+          if (document.visibilityState === 'visible') {
+            refreshData({ showLoading: false });
+          }
+        }, 5000)
+      : null;
+
+    const healthInterval = setInterval(checkHealth, 25000);
 
     return () => {
-      clearInterval(interval);
+      if (pollInterval) clearInterval(pollInterval);
+      clearInterval(healthInterval);
       window.removeEventListener('online', onOnline);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [checkHealth, refreshData]);
+  }, [checkHealth, refreshData, isLoggedIn]);
+
+  // Fetch pending admin password reset requests awaiting approval
+  const fetchPendingAdminRequests = useCallback(async () => {
+    if (!currentUser || currentUser.role !== 'Admin') {
+      setPendingAdminRequests([]);
+      return;
+    }
+    try {
+      const res = await api.admin.getPendingRequests();
+      if (res?.success) {
+        setPendingAdminRequests(res.requests || []);
+        if (res.history) {
+          setAdminRequestsHistory(res.history);
+        }
+      }
+    } catch {
+      // Background polling failure suppressed
+    }
+  }, [currentUser]);
+
+  const approveAdminResetRequest = useCallback(async (requestId) => {
+    try {
+      const res = await api.admin.approveRequest(requestId);
+      if (res?.success) {
+        setPendingAdminRequests(prev => prev.filter(r => r.id !== requestId && r._id !== requestId));
+        await fetchPendingAdminRequests();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to approve request' };
+    }
+  }, [fetchPendingAdminRequests]);
+
+  const rejectAdminResetRequest = useCallback(async (requestId) => {
+    try {
+      const res = await api.admin.rejectRequest(requestId);
+      if (res?.success) {
+        setPendingAdminRequests(prev => prev.filter(r => r.id !== requestId && r._id !== requestId));
+        await fetchPendingAdminRequests();
+      }
+      return res;
+    } catch (err) {
+      return { success: false, message: err.message || 'Failed to reject request' };
+    }
+  }, [fetchPendingAdminRequests]);
+
+  // Synchronize admin password reset notification badge
+  useEffect(() => {
+    if (!isLoggedIn || currentUser?.role !== 'Admin') return;
+    const interval = setInterval(fetchPendingAdminRequests, 12000);
+    return () => clearInterval(interval);
+  }, [isLoggedIn, currentUser?.role, fetchPendingAdminRequests]);
 
   // Explicit retry connection action for UI error recovery
   const retryConnection = useCallback(async () => {
@@ -365,10 +476,76 @@ export function FinanceProvider({ children }) {
     return healthy;
   }, [checkHealth, initializeAuth]);
 
-  // Derived financial metrics computed from real data
-  const totalSpent = useMemo(() => {
-    return transactions.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  // Dynamic Month & Days remaining calculation
+  const dateMetrics = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const monthName = now.toLocaleString('en-US', { month: 'long' });
+    const shortMonth = now.toLocaleString('en-US', { month: 'short' });
+    const totalDaysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+    const currentDay = now.getDate();
+    const daysPassed = Math.max(1, currentDay);
+    const daysRemaining = Math.max(0, totalDaysInMonth - currentDay);
+    return {
+      currentYear,
+      currentMonth,
+      currentDay,
+      monthName,
+      shortMonth,
+      totalDaysInMonth,
+      daysPassed,
+      daysRemaining,
+    };
+  }, []);
+
+  const {
+    currentYear,
+    currentDay,
+    monthName,
+    shortMonth,
+    totalDaysInMonth,
+    daysPassed,
+    daysRemaining,
+  } = dateMetrics;
+
+  // Derived shared financial metrics computed from the complete shared ledger
+  const totalIncome = useMemo(() => {
+    return transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
   }, [transactions]);
+
+  // Derive total monthly budget limit as the combined total of all individual category spend limits
+  const monthlyLimit = useMemo(() => {
+    if (budgetCategories && budgetCategories.length > 0) {
+      return budgetCategories.reduce((sum, cat) => sum + Number(cat.limit || 0), 0);
+    }
+    return monthlyLimitState || 0;
+  }, [budgetCategories, monthlyLimitState]);
+
+  const totalExpense = useMemo(() => {
+    return transactions
+      .filter(t => t.type !== 'income')
+      .reduce((sum, item) => sum + Number(item.amount || 0), 0);
+  }, [transactions]);
+
+  // Total spent across the shared ledger.
+  // The spend limit is all category spend limits together, and total spent reflects all category spending combined
+  const totalSpent = useMemo(() => {
+    const categorySpentSum = budgetCategories.reduce(
+      (sum, cat) => sum + Number(cat.spent || 0),
+      0
+    );
+    if (categorySpentSum > 0 && totalExpense === 0) {
+      return categorySpentSum;
+    }
+    return totalExpense > 0 ? totalExpense : categorySpentSum;
+  }, [totalExpense, budgetCategories]);
+
+  const balance = useMemo(() => {
+    return totalIncome - totalExpense;
+  }, [totalIncome, totalExpense]);
 
   const remainingLimit = useMemo(() => {
     return Math.max(0, monthlyLimit - totalSpent);
@@ -379,121 +556,260 @@ export function FinanceProvider({ children }) {
     return Number(((totalSpent / monthlyLimit) * 100).toFixed(1));
   }, [totalSpent, monthlyLimit]);
 
-  // Today's spend calculation (matching current day, reference date, or 'Just now')
+  // Today's spend calculation (matching current day, dynamic date format, or 'Just now')
   const todaySpent = useMemo(() => {
     const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
-    const todayStr = `${todayMonths[now.getMonth()]} ${now.getDate()}`;
+    const monthStr = todayMonths[now.getMonth()];
+    const day = now.getDate();
+    const dayPadded = String(day).padStart(2, '0');
     return transactions
-      .filter(t => t.date === todayStr || t.date === 'Nov 22' || t.time === 'Just now')
+      .filter(t => {
+        if (t.type === 'income') return false;
+        if (t.time === 'Just now') return true;
+        const d = (t.date || '').toLowerCase();
+        return (
+          d.includes(`${monthStr.toLowerCase()} ${day}`) ||
+          d.includes(`${monthStr.toLowerCase()} ${dayPadded}`) ||
+          d.includes(`${day} ${monthStr.toLowerCase()}`) ||
+          d.includes(`${dayPadded} ${monthStr.toLowerCase()}`)
+        );
+      })
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   }, [transactions]);
 
   const todayLogsCount = useMemo(() => {
     const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
-    const todayStr = `${todayMonths[now.getMonth()]} ${now.getDate()}`;
-    return transactions.filter(t => t.date === todayStr || t.date === 'Nov 22' || t.time === 'Just now').length;
+    const monthStr = todayMonths[now.getMonth()];
+    const day = now.getDate();
+    const dayPadded = String(day).padStart(2, '0');
+    return transactions.filter(t => {
+      if (t.type === 'income') return false;
+      if (t.time === 'Just now') return true;
+      const d = (t.date || '').toLowerCase();
+      return (
+        d.includes(`${monthStr.toLowerCase()} ${day}`) ||
+        d.includes(`${monthStr.toLowerCase()} ${dayPadded}`) ||
+        d.includes(`${day} ${monthStr.toLowerCase()}`) ||
+        d.includes(`${dayPadded} ${monthStr.toLowerCase()}`)
+      );
+    }).length;
   }, [transactions]);
 
   // Category breakdown for charts and budget calculations
   const categoryTotals = useMemo(() => {
     const totals = {};
-    transactions.forEach(t => {
-      if (t.category) {
-        totals[t.category] = (totals[t.category] || 0) + Number(t.amount || 0);
-      }
-    });
+    transactions
+      .filter(t => t.type !== 'income')
+      .forEach(t => {
+        if (t.category) {
+          totals[t.category] = (totals[t.category] || 0) + Number(t.amount || 0);
+        }
+      });
     return totals;
   }, [transactions]);
 
-  // Add Expense to backend
+  // Add Expense to shared backend ledger with Optimistic UI & Automatic Rollback
   const addExpense = async ({
     amount,
     category,
     description,
-    date = 'Nov 22',
+    date,
     fullDate,
     time = 'Just now',
-    user,
+    type = 'expense',
     authorizationToken,
   }) => {
     const numAmount = Number(amount);
     if (!numAmount || numAmount <= 0) {
+      toast.error('Valid positive amount is required');
       return { success: false, message: 'Valid positive amount is required' };
     }
+
+    const lockKey = 'tx-add';
+    if (pendingActionIds.has(lockKey)) {
+      return { success: false, message: 'Transaction submission already in progress' };
+    }
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    const defaultDate = `${shortMonth} ${String(currentDay).padStart(2, '0')}`;
+    const defaultFullDate = `${shortMonth} ${String(currentDay).padStart(2, '0')}, ${currentYear}`;
+    const txCategory = category || 'Food';
+    const catColor = budgetCategories.find(c => c.name.toLowerCase() === txCategory.toLowerCase())?.color || '#c9b27c';
+
+    const tempId = `temp-tx-${Date.now()}`;
+    const optimisticTx = {
+      id: tempId,
+      amount: numAmount,
+      category: txCategory,
+      categoryColor: catColor,
+      description: description || 'New expense',
+      date: date || defaultDate,
+      fullDate: fullDate || defaultFullDate,
+      time: time || 'Just now',
+      type: type || 'expense',
+      isSplit: true,
+      isOptimistic: true,
+      createdAt: new Date().toISOString(),
+    };
+
+    // 1. Optimistic UI update: Immediately insert transaction at top
+    setTransactions(prev => [optimisticTx, ...prev]);
+    setIsAddExpenseModalOpen(false);
 
     try {
       const res = await api.transactions.create({
         amount: numAmount,
-        category: category || 'Food',
+        category: txCategory,
         description: description || 'New expense',
-        date,
-        fullDate,
+        date: date || defaultDate,
+        fullDate: fullDate || defaultFullDate,
         time,
-        user: user || currentUser?.username || '',
+        type: type || 'expense',
         isSplit: true,
         authorizationToken,
       });
 
       if (res.success && res.data) {
         setIsBackendConnected(true);
-        setTransactions(prev => {
-          const combined = [res.data, ...prev.filter(t => t.id !== res.data.id)];
-          return sortTransactionsNewestFirst(deduplicateTransactions(combined));
-        });
-
-        // Optimistically update budget categories
-        setBudgetCategories(prev =>
-          prev.map(cat => {
-            if (cat.category.toLowerCase() === (category || 'food').toLowerCase()) {
-              const updatedSpent = cat.spent + numAmount;
-              const status =
-                updatedSpent > cat.limit
-                  ? 'Limit reached'
-                  : updatedSpent >= cat.limit * 0.85
-                  ? 'Near limit'
-                  : 'Healthy';
-              const statusColor =
-                status === 'Limit reached' ? '#d97070' : status === 'Near limit' ? '#d4a359' : '#8fb39a';
-              return { ...cat, spent: updatedSpent, status, statusColor };
-            }
-            return cat;
-          })
+        // Replace optimistic placeholder with real confirmed transaction
+        setTransactions(prev =>
+          sortTransactionsNewestFirst(
+            deduplicateTransactions(
+              prev.map(t => (t.id === tempId ? res.data : t))
+            )
+          )
         );
-        setIsAddExpenseModalOpen(false);
+        toast.success(`Expense of ₹${numAmount.toLocaleString('en-IN')} recorded`);
+        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
-      return {
-        success: false,
-        requiresAuthorization: res.requiresAuthorization,
-        message: res.message || 'Failed to log expense',
-      };
+
+      throw new Error(res.message || 'Failed to log expense');
     } catch (err) {
-      console.error('Failed to add expense:', err);
+      // 2. Automatic Rollback: Remove the optimistic transaction
+      setTransactions(prev => prev.filter(t => t.id !== tempId));
       setIsBackendConnected(false);
+
+      const parsed = parseApiError(err, 'Failed to log expense');
+      toast.error(parsed.message);
       return {
         success: false,
         requiresAuthorization: err.status === 403,
-        message: err.message || 'Network error while adding expense',
+        message: parsed.message,
       };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
+    }
+  };
+
+  // Update existing shared transaction with Optimistic UI & Automatic Rollback
+  const updateExpense = async (id, updates) => {
+    const lockKey = `tx-update-${id}`;
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Update already in progress' };
+
+    const txIndex = transactions.findIndex(t => t.id === id);
+    if (txIndex === -1) return { success: false, message: 'Transaction not found' };
+    const previousTx = transactions[txIndex];
+
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    // Optimistic Update
+    setTransactions(prev =>
+      prev.map(t => (t.id === id ? { ...t, ...updates } : t))
+    );
+
+    try {
+      const res = await api.transactions.update(id, updates);
+      if (res.success && res.data) {
+        setTransactions(prev =>
+          sortTransactionsNewestFirst(
+            prev.map(t => (t.id === id ? { ...t, ...res.data } : t))
+          )
+        );
+        toast.success('Transaction updated');
+        refreshData({ showLoading: false });
+        return { success: true, data: res.data };
+      }
+      throw new Error(res.message || 'Failed to update transaction');
+    } catch (err) {
+      // Rollback to snapshot
+      setTransactions(prev =>
+        prev.map(t => (t.id === id ? previousTx : t))
+      );
+      const parsed = parseApiError(err, 'Failed to update transaction');
+      toast.error(parsed.message);
+      return { success: false, message: parsed.message };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
+    }
+  };
+
+  // Delete shared transaction from ledger with Optimistic UI & Automatic Rollback
+  const deleteExpense = async (id) => {
+    const lockKey = `tx-del-${id}`;
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Deletion already in progress' };
+
+    const txIndex = transactions.findIndex(t => t.id === id);
+    if (txIndex === -1) return { success: false, message: 'Transaction not found' };
+    const previousTx = transactions[txIndex];
+
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    // Optimistically remove
+    setTransactions(prev => prev.filter(t => t.id !== id));
+
+    try {
+      const res = await api.transactions.delete(id);
+      if (res.success) {
+        toast.success('Transaction deleted');
+        refreshData({ showLoading: false });
+        return { success: true };
+      }
+      throw new Error(res.message || 'Failed to delete transaction');
+    } catch (err) {
+      // Rollback: restore transaction at original index
+      setTransactions(prev => {
+        if (prev.some(t => t.id === id)) return prev;
+        const restored = [...prev];
+        restored.splice(txIndex, 0, previousTx);
+        return restored;
+      });
+      const parsed = parseApiError(err, 'Failed to delete transaction');
+      toast.error(parsed.message);
+      return { success: false, message: parsed.message };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
   // Authorize expense exceeding ₹7,000 threshold
-  const authorizeExpense = async ({ amount, credential, credentialType, user }) => {
+  const authorizeExpense = async ({ amount, credential, credentialType }) => {
     try {
       const res = await api.transactions.authorizeExpense({
         amount: Number(amount),
         credential,
         credentialType,
-        user: user || currentUser?.username || '',
       });
       return res;
     } catch (err) {
+      const parsed = parseApiError(err, 'Verification failed. Please check your credentials.');
       return {
         success: false,
-        message: err.message || 'Verification failed. Please check your credentials.',
+        message: parsed.message,
       };
     }
   };
@@ -503,10 +819,44 @@ export function FinanceProvider({ children }) {
     return updateCategory(categoryId, { limit: newLimit });
   };
 
-  // Add category via backend API
+  // Add category via backend API with Optimistic UI & Automatic Rollback
   const addCategory = async ({ name, limit, color }) => {
     const trimmedName = name ? name.trim() : '';
-    if (!trimmedName) return { success: false, message: 'Category name is required' };
+    if (!trimmedName) {
+      toast.error('Category name is required');
+      return { success: false, message: 'Category name is required' };
+    }
+
+    const lockKey = 'cat-add';
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Action already in progress' };
+
+    // Client-side duplicate check
+    if (budgetCategories.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) {
+      const msg = `Category "${trimmedName}" already exists.`;
+      toast.error(msg);
+      return { success: false, message: msg };
+    }
+
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    const tempId = `temp-cat-${Date.now()}`;
+    const optimisticCategory = {
+      id: tempId,
+      name: trimmedName,
+      category: trimmedName,
+      limit: Number(limit) || 5000,
+      color: color || '#c9b27c',
+      spent: 0,
+      status: 'Healthy',
+      isOptimistic: true,
+    };
+
+    // 1. Optimistic UI update
+    setBudgetCategories(prev => [...prev, optimisticCategory]);
+    setAvailableCategories(prev => {
+      if (prev.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) return prev;
+      return [...prev, { name: trimmedName, color: color || '#c9b27c' }];
+    });
 
     try {
       const res = await api.budget.addCategory({
@@ -517,23 +867,62 @@ export function FinanceProvider({ children }) {
 
       if (res.success && res.data) {
         setIsBackendConnected(true);
-        setBudgetCategories(prev => [...prev, res.data]);
-        setAvailableCategories(prev => {
-          if (prev.some(c => c.name.toLowerCase() === trimmedName.toLowerCase())) return prev;
-          return [...prev, { name: trimmedName, color: color || '#c9b27c' }];
-        });
+        // Reconcile optimistic item with confirmed backend item
+        setBudgetCategories(prev =>
+          prev.map(c => (c.id === tempId ? res.data : c))
+        );
+        toast.success(`Category "${trimmedName}" created`);
+        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
-      return { success: false, message: res.message || 'Failed to create category' };
+      throw new Error(res.message || 'Failed to create category');
     } catch (err) {
-      console.error('Failed to add category:', err);
+      // 2. Automatic Rollback: remove optimistic item
+      setBudgetCategories(prev => prev.filter(c => c.id !== tempId));
+      setAvailableCategories(prev => prev.filter(c => c.name.toLowerCase() !== trimmedName.toLowerCase()));
       setIsBackendConnected(false);
-      return { success: false, message: err.message || 'Failed to add category' };
+
+      const parsed = parseApiError(err, 'Failed to create category');
+      toast.error(parsed.message);
+      return { success: false, message: parsed.message };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
-  // Update category via backend API
+  // Update category via backend API with Optimistic UI & Automatic Rollback
   const updateCategory = async (categoryId, { name, limit, color }) => {
+    const lockKey = `cat-update-${categoryId}`;
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Update already in progress' };
+
+    const previousCategory = budgetCategories.find(c => c.id === categoryId);
+    if (!previousCategory) return { success: false, message: 'Category not found' };
+
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    // 1. Optimistic UI update
+    setBudgetCategories(prev =>
+      prev.map(cat => {
+        if (cat.id !== categoryId) return cat;
+        const newLimit = limit !== undefined ? Number(limit) : cat.limit;
+        const newSpent = cat.spent || 0;
+        const percent = newLimit > 0 ? (newSpent / newLimit) * 100 : 0;
+        const status = percent > 100 ? 'Exceeded' : percent >= 80 ? 'Warning' : 'Healthy';
+        return {
+          ...cat,
+          name: name !== undefined ? name : cat.name,
+          category: name !== undefined ? name : cat.category,
+          limit: newLimit,
+          color: color || cat.color,
+          status,
+        };
+      })
+    );
+
     try {
       const res = await api.budget.updateCategory(categoryId, { name, limit, color });
       if (res.success && res.data) {
@@ -541,36 +930,77 @@ export function FinanceProvider({ children }) {
         setBudgetCategories(prev =>
           prev.map(cat => (cat.id === categoryId ? res.data : cat))
         );
+        toast.success(`Category "${res.data.name || previousCategory.name}" updated`);
+        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
-      return { success: false, message: res.message || 'Failed to update category' };
+      throw new Error(res.message || 'Failed to update category');
     } catch (err) {
-      console.error('Failed to update category:', err);
+      // 2. Automatic Rollback: restore previous category snapshot
+      setBudgetCategories(prev =>
+        prev.map(cat => (cat.id === categoryId ? previousCategory : cat))
+      );
       setIsBackendConnected(false);
-      return { success: false, message: err.message || 'Failed to update category' };
+
+      const parsed = parseApiError(err, 'Failed to update category');
+      toast.error(parsed.message);
+      return { success: false, message: parsed.message };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
-  // Delete category via backend API
+  // Delete category via backend API with Optimistic UI & Automatic Rollback
   const deleteCategory = async (categoryId) => {
+    const lockKey = `cat-del-${categoryId}`;
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Deletion already in progress' };
+
+    const catIndex = budgetCategories.findIndex(c => c.id === categoryId);
+    if (catIndex === -1) return { success: false, message: 'Category not found' };
+    const previousCategory = budgetCategories[catIndex];
+    const previousAvailable = [...availableCategories];
+
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    // 1. Optimistic UI update: Immediately remove from UI
+    setBudgetCategories(prev => prev.filter(cat => cat.id !== categoryId));
+    setAvailableCategories(prev =>
+      prev.filter(c => c.name.toLowerCase() !== previousCategory.name.toLowerCase())
+    );
+
     try {
       const res = await api.budget.deleteCategory(categoryId);
       if (res.success) {
         setIsBackendConnected(true);
-        const catToDelete = budgetCategories.find(c => c.id === categoryId);
-        setBudgetCategories(prev => prev.filter(cat => cat.id !== categoryId));
-        if (catToDelete) {
-          setAvailableCategories(prev =>
-            prev.filter(c => c.name.toLowerCase() !== catToDelete.name.toLowerCase())
-          );
-        }
+        toast.success(`Category "${previousCategory.name}" deleted`);
+        refreshData({ showLoading: false });
         return { success: true };
       }
-      return { success: false, message: res.message || 'Failed to delete category' };
+      throw new Error(res.message || 'Failed to delete category');
     } catch (err) {
-      console.error('Failed to delete category:', err);
+      // 2. Automatic Rollback: Restore category at original index
+      setBudgetCategories(prev => {
+        if (prev.some(c => c.id === categoryId)) return prev;
+        const restored = [...prev];
+        restored.splice(catIndex, 0, previousCategory);
+        return restored;
+      });
+      setAvailableCategories(previousAvailable);
       setIsBackendConnected(false);
-      return { success: false, message: err.message || 'Failed to delete category' };
+
+      const parsed = parseApiError(err, 'Failed to delete category');
+      toast.error(parsed.message);
+      return { success: false, message: parsed.message };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
@@ -681,6 +1111,8 @@ export function FinanceProvider({ children }) {
     setBudgetCategories([]);
     setHouseholdMembers([]);
     setHouseholdBalances(null);
+    setPendingAdminRequests([]);
+    setAdminRequestsHistory([]);
     setAuthStatus('UNAUTHENTICATED');
     setCurrentScreen('login');
     setError(null);
@@ -702,17 +1134,29 @@ export function FinanceProvider({ children }) {
     }
   }, [logout]);
 
-  // Update User Profile (Username & Profile Image)
+  // Update User Profile (Username & Profile Image) with Optimistic UI & Automatic Rollback
   const updateProfile = async ({ username: newUsername, avatar, profileImage }) => {
-    try {
-      const payload = {};
-      if (newUsername !== undefined) payload.username = newUsername;
-      if (avatar !== undefined) payload.avatar = avatar;
-      if (profileImage !== undefined) payload.profileImage = profileImage;
-      // If profileImage is provided without avatar, or vice versa, keep them in sync
-      if (profileImage && !avatar) payload.avatar = profileImage;
-      if (avatar && !profileImage) payload.profileImage = avatar;
+    const previousUser = currentUser ? { ...currentUser } : null;
+    const lockKey = 'profile-update';
+    if (pendingActionIds.has(lockKey)) return { success: false, message: 'Profile update in progress' };
 
+    setPendingActionIds(prev => new Set(prev).add(lockKey));
+
+    const payload = {};
+    if (newUsername !== undefined) payload.username = newUsername;
+    if (avatar !== undefined) payload.avatar = avatar;
+    if (profileImage !== undefined) payload.profileImage = profileImage;
+    // If profileImage is provided without avatar, or vice versa, keep them in sync
+    if (profileImage && !avatar) payload.avatar = profileImage;
+    if (avatar && !profileImage) payload.profileImage = avatar;
+
+    // 1. Optimistic UI update
+    setCurrentUser(prev => ({
+      ...prev,
+      ...payload,
+    }));
+
+    try {
       const res = await api.auth.updateProfile(payload);
       if (res.success) {
         if (res.token) {
@@ -723,7 +1167,7 @@ export function FinanceProvider({ children }) {
         }
         setHouseholdMembers(prev =>
           prev.map(m =>
-            m.username === currentUser.username || (newUsername && m.username === newUsername)
+            m.username === currentUser?.username || (newUsername && m.username === newUsername)
               ? {
                   ...m,
                   username: newUsername || m.username,
@@ -733,23 +1177,27 @@ export function FinanceProvider({ children }) {
               : m
           )
         );
-        if (newUsername) {
-          setTransactions(prev =>
-            prev.map(t =>
-              t.user?.toLowerCase() === currentUser.username.toLowerCase()
-                ? { ...t, user: newUsername }
-                : t
-            )
-          );
-        }
+        toast.success(res.message || 'Profile updated successfully');
         return { success: true, message: res.message || 'Profile updated successfully', user: res.user };
       }
-      return { success: false, message: res.message || 'Failed to update profile' };
+      throw new Error(res.message || 'Failed to update profile');
     } catch (err) {
+      // 2. Rollback to snapshot
+      if (previousUser) {
+        setCurrentUser(previousUser);
+      }
+      const parsed = parseApiError(err, 'Error updating profile');
+      toast.error(parsed.message);
       return {
         success: false,
-        message: err.data?.message || err.message || 'Error updating profile',
+        message: parsed.message,
       };
+    } finally {
+      setPendingActionIds(prev => {
+        const next = new Set(prev);
+        next.delete(lockKey);
+        return next;
+      });
     }
   };
 
@@ -834,8 +1282,8 @@ export function FinanceProvider({ children }) {
     }
   };
 
-  const navigateTo = screenName => {
-    setCurrentScreen(screenName);
+  const navigateTo = (screenName, options = {}) => {
+    setCurrentScreen(screenName, options);
   };
 
   return (
@@ -879,13 +1327,25 @@ export function FinanceProvider({ children }) {
         setMonthlyLimit,
         householdMembers,
         householdBalances,
+        totalIncome,
+        totalExpense,
         totalSpent,
+        balance,
         remainingLimit,
         percentSpent,
         todaySpent,
         todayLogsCount,
         categoryTotals,
+        daysRemaining,
+        daysPassed,
+        totalDaysInMonth,
+        monthName,
+        shortMonth,
+        currentDay,
+        currentYear,
         addExpense,
+        updateExpense,
+        deleteExpense,
         authorizeExpense,
         updateCategoryLimit,
         addCategory,
@@ -894,10 +1354,21 @@ export function FinanceProvider({ children }) {
         isLoading,
         isRefreshing,
         isBackendConnected,
+        isActionPending,
         error,
         refreshData,
         checkHealth,
         retryConnection,
+        pendingAdminRequests,
+        pendingAdminRequestsCount: pendingAdminRequests.length,
+        adminRequestsHistory,
+        isReviewResetModalOpen,
+        setIsReviewResetModalOpen,
+        selectedResetRequest,
+        setSelectedResetRequest,
+        fetchPendingAdminRequests,
+        approveAdminResetRequest,
+        rejectAdminResetRequest,
       }}
     >
       {children}

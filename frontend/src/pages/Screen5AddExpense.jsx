@@ -32,7 +32,7 @@ const toFormattedDates = (dateObj) => {
 };
 
 export default function Screen5AddExpense({ customTheme = null, onNavigate, onClose }) {
-  const { addExpense, navigateTo, currentUser } = useFinance();
+  const { addExpense, navigateTo } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -74,7 +74,6 @@ export default function Screen5AddExpense({ customTheme = null, onNavigate, onCl
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || '',
     });
 
     if (res?.success) {

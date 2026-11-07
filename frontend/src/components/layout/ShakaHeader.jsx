@@ -4,7 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 
 export default function ShakaHeader() {
   const { currentScreen, setCurrentScreen, viewMode, setViewMode } = useFinance();
-  const { setTheme, isDark } = useTheme();
+  const { toggleTheme, isDark } = useTheme();
 
   const screens = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -104,7 +104,7 @@ export default function ShakaHeader() {
         <div className="bg-neutral-950 dark:bg-[#0e0e10] p-1 rounded-xl border border-neutral-800 dark:border-[#26262b] flex items-center gap-1 text-xs">
           <button
             type="button"
-            onClick={() => setTheme('dark')}
+            onClick={(e) => toggleTheme(e, 'dark')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1 cursor-pointer ${
               isDark
                 ? 'bg-[#c9b27c] text-neutral-950'
@@ -116,7 +116,7 @@ export default function ShakaHeader() {
           </button>
           <button
             type="button"
-            onClick={() => setTheme('light')}
+            onClick={(e) => toggleTheme(e, 'light')}
             className={`px-3 py-1.5 rounded-lg font-semibold transition-all flex items-center gap-1 cursor-pointer ${
               !isDark
                 ? 'bg-[#c9b27c] text-neutral-950'

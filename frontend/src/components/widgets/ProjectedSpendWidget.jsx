@@ -5,12 +5,13 @@ import { formatCurrency } from '../../data/financeData';
 import { Skeleton } from '../common/Skeleton';
 
 export default function ProjectedSpendWidget({ customTheme = null }) {
-  const { totalSpent, monthlyLimit, isLoading } = useFinance();
+  const { totalSpent, monthlyLimit, daysPassed, totalDaysInMonth, isLoading } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  // Assuming 22 days passed, projected = (totalSpent / 22) * 30
-  const projectedVal = Math.round((totalSpent / 22) * 30) || 25080;
+  const projectedVal = daysPassed > 0
+    ? Math.round((totalSpent / daysPassed) * totalDaysInMonth)
+    : totalSpent;
   const underPercent = monthlyLimit > 0
     ? (((monthlyLimit - projectedVal) / monthlyLimit) * 100).toFixed(1)
     : '0.0';

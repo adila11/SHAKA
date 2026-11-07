@@ -219,7 +219,12 @@ export async function request(endpoint, options = {}, isRetry = false) {
       }
     }
 
-    err.isNetworkError = err.message === 'Failed to fetch' || err.code === 'ECONNREFUSED';
+    err.isNetworkError =
+      (typeof navigator !== 'undefined' && !navigator.onLine) ||
+      err.message === 'Failed to fetch' ||
+      err.message?.includes('NetworkError') ||
+      err.message?.includes('Network request failed') ||
+      err.code === 'ECONNREFUSED';
     console.error(`API Error on [${config.method || 'GET'} ${endpoint}]:`, err.message);
     throw err;
   }
@@ -316,10 +321,10 @@ export const api = {
       return request(`/transactions${query ? `?${query}` : ''}`);
     },
     getById: (id) => request(`/transactions/${id}`),
-    authorizeExpense: ({ amount, credential, credentialType, user }) =>
+    authorizeExpense: ({ amount, credential, credentialType }) =>
       request('/transactions/authorize', {
         method: 'POST',
-        body: JSON.stringify({ amount, credential, credentialType, user }),
+        body: JSON.stringify({ amount, credential, credentialType }),
       }),
     create: (expense) =>
       request('/transactions', {
@@ -366,6 +371,10 @@ export const api = {
   // Analytics & Metrics
   analytics: {
     getSummary: () => request('/analytics/summary'),
+    getDashboard: () => request('/analytics/dashboard'),
+    getCategorySpending: () => request('/analytics/category-spending'),
+    getMonthly: () => request('/analytics/monthly'),
+    getReports: () => request('/analytics/reports'),
   },
 
   // Household & Shared Balances
@@ -375,6 +384,39 @@ export const api = {
     settle: () =>
       request('/household/settle', {
         method: 'POST',
+      }),
+  },
+
+  // Admin Two-Admin Password Recovery System
+  admin: {
+    forgotPassword: (email) =>
+      request('/admin/forgot-password', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+        isPublic: true,
+      }),
+    checkResetStatus: ({ requestId, lookupToken }) =>
+      request(
+        `/admin/password-reset-status?requestId=${encodeURIComponent(requestId)}&lookupToken=${encodeURIComponent(lookupToken)}`,
+        {
+          method: 'GET',
+          isPublic: true,
+        }
+      ),
+    completeResetPassword: ({ requestId, resetToken, newPassword, confirmPassword }) =>
+      request('/admin/reset-password', {
+        method: 'POST',
+        body: JSON.stringify({ requestId, resetToken, newPassword, confirmPassword }),
+        isPublic: true,
+      }),
+    getPendingRequests: () => request('/admin/password-reset-requests'),
+    approveRequest: (requestId) =>
+      request(`/admin/password-reset-requests/${requestId}/approve`, {
+        method: 'PATCH',
+      }),
+    rejectRequest: (requestId) =>
+      request(`/admin/password-reset-requests/${requestId}/reject`, {
+        method: 'PATCH',
       }),
   },
 };

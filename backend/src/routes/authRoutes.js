@@ -12,9 +12,9 @@ import {
   logout,
   getMe,
   updateProfile,
-  forgotPassword,
   changePassword,
 } from '../controllers/authController.js';
+import { createPasswordResetRequest } from '../controllers/adminController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = Router();
@@ -26,7 +26,7 @@ router.post('/register', signup);
 router.post('/refresh', refresh);
 router.post('/verify-access-code', verifyAccessCode);
 router.post('/logout', logout);
-router.post('/forgot-password', forgotPassword);
+router.post('/forgot-password', createPasswordResetRequest);
 
 // Protected session & access code management
 router.get('/me', protect, getMe);

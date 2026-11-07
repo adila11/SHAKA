@@ -44,7 +44,9 @@ export const errorHandler = (err, req, res, next) => {
     success: false,
     message,
     errorCode,
+    code: errorCode,
     status: statusCode,
+    errors: err.errors || null,
     timestamp: new Date().toISOString(),
     ...(process.env.NODE_ENV === 'production' ? {} : { stack: err.stack }),
   });

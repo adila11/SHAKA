@@ -15,10 +15,14 @@ const router = Router();
 // Enforce authentication on all budget endpoints
 router.use(protect);
 
-router.get('/categories', getBudgetCategories);
-router.post('/categories', requireAdmin, addBudgetCategory);
-router.put('/categories/:id', requireAdmin, updateBudgetCategory);
-router.delete('/categories/:id', requireAdmin, deleteBudgetCategory);
+// Supports both /api/budget/categories and /api/budget-categories
+router.route(['/categories', '/'])
+  .get(getBudgetCategories)
+  .post(requireAdmin, addBudgetCategory);
+
+router.route(['/categories/:id', '/:id'])
+  .put(requireAdmin, updateBudgetCategory)
+  .delete(requireAdmin, deleteBudgetCategory);
 
 router.get('/monthly-limit', getMonthlyLimit);
 router.put('/monthly-limit', requireAdmin, updateMonthlyLimit);
