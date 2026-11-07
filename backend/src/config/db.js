@@ -26,10 +26,15 @@ export const seedDatabase = async () => {
     }
 
     const txCount = await Transaction.countDocuments();
-    if (txCount === 0) {
+    if (txCount === 0 && INITIAL_DATA.transactions.length > 0) {
       console.log('🌱 Seeding initial transactions into MongoDB...');
       await Transaction.insertMany(INITIAL_DATA.transactions);
     } else {
+      // Clean legacy dummy sample transactions while preserving user transactions
+      await Transaction.deleteMany({
+        id: { $in: ['tx-1', 'tx-2', 'tx-3', 'tx-4', 'tx-5', 'tx-6', 'tx-7', 'tx-8', 'tx-9', 'tx-10'] },
+      });
+
       // Migration: Ensure all existing transactions have type ('expense' default)
       await Transaction.updateMany(
         { type: { $exists: false } },

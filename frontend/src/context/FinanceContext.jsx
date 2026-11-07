@@ -199,6 +199,7 @@ export function FinanceProvider({ children }) {
 
     isFetchingRef.current = true;
     const showSkeleton = options.showLoading ?? false;
+    const isFullSync = options.full ?? false;
     if (showSkeleton) {
       setIsLoading(true);
     } else {
@@ -207,16 +208,23 @@ export function FinanceProvider({ children }) {
     setError(null);
 
     try {
-      const [txRes, catRes, limitRes, availRes, membersRes, balancesRes] = await Promise.allSettled([
+      const coreRequests = [
         api.transactions.getAll(),
         api.budget.getCategories(),
         api.budget.getMonthlyLimit(),
-        api.budget.getAvailableCategories(),
-        api.household.getMembers(),
-        api.household.getBalances(),
-      ]);
+      ];
+      if (isFullSync) {
+        coreRequests.push(
+          api.budget.getAvailableCategories(),
+          api.household.getMembers(),
+          api.household.getBalances()
+        );
+      }
 
-      const anySuccess = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].some(
+      const results = await Promise.allSettled(coreRequests);
+      const [txRes, catRes, limitRes, availRes, membersRes, balancesRes] = results;
+
+      const anySuccess = results.some(
         r => r.status === 'fulfilled' && r.value?.success
       );
 
@@ -224,34 +232,31 @@ export function FinanceProvider({ children }) {
         setIsBackendConnected(true);
       }
 
-      if (txRes.status === 'fulfilled' && txRes.value?.success) {
+      if (txRes?.status === 'fulfilled' && txRes.value?.success) {
         setTransactions(sortTransactionsNewestFirst(deduplicateTransactions(txRes.value.data || [])));
       }
 
-      if (catRes.status === 'fulfilled' && catRes.value?.success) {
+      if (catRes?.status === 'fulfilled' && catRes.value?.success) {
         setBudgetCategories(catRes.value.data || []);
       }
 
-      if (limitRes.status === 'fulfilled' && limitRes.value?.success) {
+      if (limitRes?.status === 'fulfilled' && limitRes.value?.success) {
         setMonthlyLimitState(limitRes.value.monthlyLimit || 0);
       }
 
-      if (availRes.status === 'fulfilled' && availRes.value?.success && availRes.value.data?.length) {
+      if (availRes?.status === 'fulfilled' && availRes.value?.success && availRes.value.data?.length) {
         setAvailableCategories(availRes.value.data);
       }
 
-      if (membersRes.status === 'fulfilled' && membersRes.value?.success && membersRes.value.data?.length) {
+      if (membersRes?.status === 'fulfilled' && membersRes.value?.success && membersRes.value.data?.length) {
         setHouseholdMembers(membersRes.value.data);
       }
 
-      if (balancesRes.status === 'fulfilled' && balancesRes.value?.success) {
+      if (balancesRes?.status === 'fulfilled' && balancesRes.value?.success) {
         setHouseholdBalances(balancesRes.value.data || null);
       }
-    } catch (err) {
-      console.warn('Failed to fetch from backend:', err);
-      if (err.status !== 401) {
-        setIsBackendConnected(false);
-      }
+    } catch {
+      setIsBackendConnected(false);
     } finally {
       isFetchingRef.current = false;
       setIsLoading(false);
@@ -322,7 +327,7 @@ export function FinanceProvider({ children }) {
         setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
         setAuthStatus('AUTHENTICATED');
         setIsBackendConnected(true);
-        refreshData({ showLoading: false });
+        refreshData({ showLoading: false, full: true });
         fetchSessionInfo();
       } else {
         localStorage.removeItem('shaka_token');
@@ -376,19 +381,19 @@ export function FinanceProvider({ children }) {
   useEffect(() => {
     const onOnline = () => {
       checkHealth();
-      refreshData({ showLoading: false });
+      refreshData({ showLoading: false, full: false });
     };
 
     const onFocus = () => {
       checkHealth();
       if (isLoggedIn) {
-        refreshData({ showLoading: false });
+        refreshData({ showLoading: false, full: false });
       }
     };
 
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible' && isLoggedIn) {
-        refreshData({ showLoading: false });
+        refreshData({ showLoading: false, full: false });
       }
     };
 
@@ -396,16 +401,16 @@ export function FinanceProvider({ children }) {
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    // Active ledger synchronization polling every 5 seconds across connected clients
+    // Active ledger synchronization polling every 25 seconds when tab is visible
     const pollInterval = isLoggedIn
       ? setInterval(() => {
           if (document.visibilityState === 'visible') {
-            refreshData({ showLoading: false });
+            refreshData({ showLoading: false, full: false });
           }
-        }, 5000)
+        }, 25000)
       : null;
 
-    const healthInterval = setInterval(checkHealth, 25000);
+    const healthInterval = setInterval(checkHealth, 30000);
 
     return () => {
       if (pollInterval) clearInterval(pollInterval);
@@ -464,7 +469,13 @@ export function FinanceProvider({ children }) {
   // Synchronize admin password reset notification badge
   useEffect(() => {
     if (!isLoggedIn || currentUser?.role !== 'Admin') return;
-    const interval = setInterval(fetchPendingAdminRequests, 12000);
+    const checkRequests = () => {
+      if (document.visibilityState === 'visible') {
+        fetchPendingAdminRequests();
+      }
+    };
+    checkRequests();
+    const interval = setInterval(checkRequests, 20000);
     return () => clearInterval(interval);
   }, [isLoggedIn, currentUser?.role, fetchPendingAdminRequests]);
 
@@ -682,7 +693,6 @@ export function FinanceProvider({ children }) {
           )
         );
         toast.success(`Expense of ₹${numAmount.toLocaleString('en-IN')} recorded`);
-        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
 
@@ -733,7 +743,6 @@ export function FinanceProvider({ children }) {
           )
         );
         toast.success('Transaction updated');
-        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
       throw new Error(res.message || 'Failed to update transaction');
@@ -772,7 +781,6 @@ export function FinanceProvider({ children }) {
       const res = await api.transactions.delete(id);
       if (res.success) {
         toast.success('Transaction deleted');
-        refreshData({ showLoading: false });
         return { success: true };
       }
       throw new Error(res.message || 'Failed to delete transaction');
@@ -872,7 +880,6 @@ export function FinanceProvider({ children }) {
           prev.map(c => (c.id === tempId ? res.data : c))
         );
         toast.success(`Category "${trimmedName}" created`);
-        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
       throw new Error(res.message || 'Failed to create category');
@@ -931,7 +938,6 @@ export function FinanceProvider({ children }) {
           prev.map(cat => (cat.id === categoryId ? res.data : cat))
         );
         toast.success(`Category "${res.data.name || previousCategory.name}" updated`);
-        refreshData({ showLoading: false });
         return { success: true, data: res.data };
       }
       throw new Error(res.message || 'Failed to update category');
@@ -977,7 +983,6 @@ export function FinanceProvider({ children }) {
       if (res.success) {
         setIsBackendConnected(true);
         toast.success(`Category "${previousCategory.name}" deleted`);
-        refreshData({ showLoading: false });
         return { success: true };
       }
       throw new Error(res.message || 'Failed to delete category');

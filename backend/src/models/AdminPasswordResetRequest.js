@@ -69,6 +69,7 @@ adminPasswordResetRequestSchema.index({ status: 1 });
 adminPasswordResetRequestSchema.index({ requestingAdminUsername: 1 });
 adminPasswordResetRequestSchema.index({ requestingAdminEmail: 1 });
 adminPasswordResetRequestSchema.index({ expiresAt: 1 });
+adminPasswordResetRequestSchema.index({ lookupTokenHash: 1 });
 
 export const AdminPasswordResetRequest = mongoose.model(
   'AdminPasswordResetRequest',

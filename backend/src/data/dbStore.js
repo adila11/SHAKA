@@ -13,11 +13,7 @@ const memState = {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   })),
-  transactions: JSON.parse(JSON.stringify(INITIAL_DATA.transactions)).map(t => ({
-    ...t,
-    createdAt: t.createdAt || new Date(`${t.fullDate || t.date + ', 2026'} ${t.time || '12:00 PM'}`).toISOString(),
-    updatedAt: t.updatedAt || new Date(`${t.fullDate || t.date + ', 2026'} ${t.time || '12:00 PM'}`).toISOString(),
-  })),
+  transactions: [],
   budgetCategories: JSON.parse(JSON.stringify(INITIAL_DATA.budgetCategories)),
   adminPasswordResetRequests: [],
 };

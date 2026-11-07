@@ -7,10 +7,10 @@ import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 
 export default function LedgerPage() {
-  const { transactions, totalSpent, setCurrentScreen, availableCategories, isLoading } = useFinance();
+  const { transactions, totalSpent, setCurrentScreen, availableCategories, isLoading, shortMonth, currentYear } = useFinance();
   const { isDark } = useTheme();
 
-  const [selectedMonth, setSelectedMonth] = useState('Nov 2026');
+  const [selectedMonth, setSelectedMonth] = useState(() => `${shortMonth || 'Nov'} ${currentYear || 2026}`);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
 

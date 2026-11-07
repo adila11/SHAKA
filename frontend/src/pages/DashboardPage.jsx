@@ -18,6 +18,8 @@ export default function DashboardPage() {
     totalSpent,
     monthlyLimit,
     daysPassed,
+    monthName,
+    currentYear,
     householdMembers,
     setCurrentScreen,
     isLoading,
@@ -45,7 +47,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2 mb-1">
               <span className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
                 <Calendar className="w-3.5 h-3.5 text-[#c9b27c]" />
-                November 2026
+                {monthName} {currentYear}
               </span>
               <span className="w-1 h-1 rounded-full bg-[#8a8a93]" />
               <BackendSyncBadge />
