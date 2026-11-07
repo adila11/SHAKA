@@ -164,7 +164,7 @@ export default function AddExpenseModal() {
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || 'abdulshamil',
+      user: currentUser?.username || '',
     };
 
     if (numAmount > 7000) {

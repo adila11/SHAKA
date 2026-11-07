@@ -8,7 +8,7 @@ export default function Screen8ChangePassword({ customTheme = null, onNavigate }
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  const [currentPassword, setCurrentPassword] = useState('currentpass123');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
@@ -56,7 +56,7 @@ export default function Screen8ChangePassword({ customTheme = null, onNavigate }
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-3.5">
+      <form onSubmit={handleSubmit} noValidate className="space-y-3.5">
         <div>
           <label className={`block text-xs font-semibold uppercase tracking-wider mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Current Password

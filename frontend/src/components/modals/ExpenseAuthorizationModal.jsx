@@ -46,7 +46,7 @@ export default function ExpenseAuthorizationModal({
         amount,
         credential: trimmed,
         credentialType: isAccessCodeEnabled ? 'accessCode' : 'password',
-        user: currentUser?.username || 'abdulshamil',
+        user: currentUser?.username || '',
       });
 
       if (res?.success && res.authorizationToken) {

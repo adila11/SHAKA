@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   login,
+  signup,
   refresh,
   verifyAccessCode,
   enableAccessCode,
@@ -20,6 +21,8 @@ const router = Router();
 
 // Public authentication & reauthentication
 router.post('/login', login);
+router.post('/signup', signup);
+router.post('/register', signup);
 router.post('/refresh', refresh);
 router.post('/verify-access-code', verifyAccessCode);
 router.post('/logout', logout);

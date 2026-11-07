@@ -5,7 +5,7 @@ import { useTheme } from '../context/ThemeContext';
 import { getProfileImageUrl } from '../data/financeData';
 
 export default function Screen7Profile({ customTheme = null, onNavigate }) {
-  const { currentUser, navigateTo, setIsLoggedIn } = useFinance();
+  const { currentUser, navigateTo, logout } = useFinance();
   const { isDark: globalDark, toggleTheme } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
@@ -18,8 +18,7 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    handleNav('login');
+    logout();
   };
 
   return (
@@ -40,7 +39,7 @@ export default function Screen7Profile({ customTheme = null, onNavigate }) {
             />
           </div>
           <h3 className={`text-base font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {currentUser?.username || 'abdulshamil'}
+            {currentUser?.username || 'User'}
           </h3>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
             Multi-User Shared Ledger Admin

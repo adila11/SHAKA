@@ -3,6 +3,8 @@ export const INITIAL_DATA = {
   users: [
     {
       username: 'abdulshamil',
+      email: 'abdulshamil@shaka.local',
+      role: 'Admin',
       avatar: 'profile1',
       profileImage: 'profile1',
       password: '$2a$10$TfRnUe5aEGny84JO/WM6g.1pvT56w85s3sk2fEUawizXbHG8Uq5Nm',
@@ -14,6 +16,8 @@ export const INITIAL_DATA = {
     },
     {
       username: 'adilaka',
+      email: 'adilaka@shaka.local',
+      role: 'Member',
       avatar: 'profile2',
       profileImage: 'profile2',
       password: '$2a$10$7MvG7FH3vvfMH5xQrabd3eSL01uGDZp7Jfuk/ksx76Y083hUmItH6',

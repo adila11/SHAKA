@@ -3,7 +3,17 @@ import { dbStore } from '../data/dbStore.js';
 export const getMembers = async (req, res, next) => {
   try {
     const users = await dbStore.users.find();
-    res.status(200).json({ success: true, data: users });
+    const safeUsers = users.map(u => ({
+      username: u.username,
+      email: u.email,
+      role: u.role || 'Member',
+      avatar: u.avatar || 'profile1',
+      profileImage: u.profileImage || 'profile1',
+      accessCodeEnabled: Boolean(u.accessCodeEnabled),
+      createdAt: u.createdAt,
+      updatedAt: u.updatedAt,
+    }));
+    res.status(200).json({ success: true, data: safeUsers });
   } catch (error) {
     next(error);
   }

@@ -33,20 +33,23 @@ export const dbStore = {
   users: {
     find: async () => {
       if (isDbConnected()) {
-        const users = await User.find().select('username avatar profileImage accessCodeEnabled createdAt updatedAt').lean();
+        const users = await User.find().select('username email role avatar profileImage accessCodeEnabled createdAt updatedAt').lean();
         return users.map(u => ({
           ...u,
+          role: u.role || 'Member',
           avatar: u.profileImage || u.avatar || 'profile1',
           profileImage: u.profileImage || u.avatar || 'profile1',
         }));
       }
       return memState.users.map(({ password, accessCodeHash, sessions, ...u }) => ({
         ...u,
+        role: u.role || 'Member',
         avatar: u.profileImage || u.avatar || 'profile1',
         profileImage: u.profileImage || u.avatar || 'profile1',
       }));
     },
     findByUsername: async (username) => {
+      if (!username) return null;
       const reg = new RegExp(`^${username.trim()}$`, 'i');
       if (isDbConnected()) {
         return User.findOne({ username: reg });
@@ -54,7 +57,41 @@ export const dbStore = {
       const match = memState.users.find(u => reg.test(u.username));
       return match ? { ...match, toObject: () => ({ ...match }) } : null;
     },
+    findByEmail: async (email) => {
+      if (!email) return null;
+      const reg = new RegExp(`^${email.trim()}$`, 'i');
+      if (isDbConnected()) {
+        return User.findOne({ email: reg });
+      }
+      const match = memState.users.find(u => u.email && reg.test(u.email));
+      return match ? { ...match, toObject: () => ({ ...match }) } : null;
+    },
+    createUser: async (userData) => {
+      if (isDbConnected()) {
+        const newUser = new User(userData);
+        await newUser.save();
+        return newUser.toObject();
+      }
+      const nowIso = new Date().toISOString();
+      const memUser = {
+        ...userData,
+        _id: `user-${Date.now()}`,
+        role: userData.role || 'Member',
+        avatar: userData.avatar || 'profile1',
+        profileImage: userData.profileImage || 'profile1',
+        accessCodeEnabled: false,
+        accessCodeHash: null,
+        failedAccessCodeAttempts: 0,
+        accessCodeLockoutUntil: null,
+        sessions: [],
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      };
+      memState.users.push(memUser);
+      return { ...memUser, toObject: () => ({ ...memUser }) };
+    },
     findBySessionId: async (sessionId) => {
+      if (!sessionId) return null;
       if (isDbConnected()) {
         return User.findOne({ 'sessions.sessionId': sessionId });
       }

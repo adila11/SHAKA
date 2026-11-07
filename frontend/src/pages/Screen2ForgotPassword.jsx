@@ -8,7 +8,7 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  const [username, setUsername] = useState('alex_rivera');
+  const [username, setUsername] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleNav = (screen) => {
@@ -50,7 +50,7 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate className="space-y-4">
         <div>
           <label
             className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
@@ -69,7 +69,7 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
                   ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-white border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="e.g. alex_rivera"
+              placeholder="Username"
             />
             <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
               <Mail className="w-4 h-4" />

@@ -74,7 +74,7 @@ export default function Screen5AddExpense({ customTheme = null, onNavigate, onCl
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || 'abdulshamil',
+      user: currentUser?.username || '',
     });
 
     if (res?.success) {

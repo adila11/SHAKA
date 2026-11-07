@@ -61,6 +61,7 @@ export const login = async (req, res, next) => {
       {
         id: user._id || user.username,
         username: user.username,
+        role: user.role || 'Member',
         sessionId,
         type: 'access',
       },
@@ -73,6 +74,7 @@ export const login = async (req, res, next) => {
       {
         id: user._id || user.username,
         username: user.username,
+        role: user.role || 'Member',
         sessionId,
         type: 'refresh',
       },
@@ -89,7 +91,7 @@ export const login = async (req, res, next) => {
       lastActivityAt: now,
       expiresAt,
       revoked: false,
-      deviceInfo: req.headers['user-agent'] || 'Web Browser',
+      deviceInfo: req.headers?.['user-agent'] || 'Web Browser',
     };
 
     await dbStore.users.addSession(user.username, sessionData);
@@ -99,6 +101,7 @@ export const login = async (req, res, next) => {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
       sameSite: 'lax',
+      path: '/',
       maxAge: 3 * 24 * 60 * 60 * 1000,
     });
 
@@ -112,11 +115,165 @@ export const login = async (req, res, next) => {
       accessCodeEnabled: Boolean(user.accessCodeEnabled),
       user: {
         username: user.username,
+        email: user.email || `${user.username}@shaka.local`,
+        role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// 1b. Signup / Registration
+export const signup = async (req, res, next) => {
+  try {
+    const { username, email, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username and password are required',
+      });
+    }
+
+    const trimmedUser = String(username).trim().toLowerCase();
+    if (trimmedUser.length < 3 || trimmedUser.length > 30) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username must be between 3 and 30 characters long',
+      });
+    }
+
+    if (!/^[a-z0-9_]+$/.test(trimmedUser)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Username may only contain lowercase letters, numbers, and underscores',
+      });
+    }
+
+    const trimmedEmail = email ? String(email).trim().toLowerCase() : '';
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid email address format',
+      });
+    }
+
+    if (typeof password !== 'string' || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long',
+      });
+    }
+
+    // Check if username already exists
+    const existingUser = await dbStore.users.findByUsername(trimmedUser);
+    if (existingUser) {
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this username already exists',
+        errorCode: 'DUPLICATE_RESOURCE',
+      });
+    }
+
+    // Check if email already exists
+    if (trimmedEmail) {
+      const existingEmail = await dbStore.users.findByEmail(trimmedEmail);
+      if (existingEmail) {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email address already exists',
+          errorCode: 'DUPLICATE_RESOURCE',
+        });
+      }
+    }
+
+    // Hash password securely with bcrypt
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const newUser = await dbStore.users.createUser({
+      username: trimmedUser,
+      email: trimmedEmail || `${trimmedUser}@shaka.local`,
+      password: hashedPassword,
+      role: 'Member',
+      avatar: 'profile1',
+      profileImage: 'profile1',
+      accessCodeEnabled: false,
+    });
+
+    // Create session and tokens for instant login upon signup
+    const sessionId = crypto.randomUUID();
+    const now = new Date();
+    const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+
+    const token = jwt.sign(
+      {
+        id: newUser._id || newUser.username,
+        username: newUser.username,
+        role: newUser.role || 'Member',
+        sessionId,
+        type: 'access',
+      },
+      config.jwtSecret,
+      { expiresIn: '24h' }
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        id: newUser._id || newUser.username,
+        username: newUser.username,
+        role: newUser.role || 'Member',
+        sessionId,
+        type: 'refresh',
+      },
+      config.jwtRefreshSecret,
+      { expiresIn: '3d' }
+    );
+
+    const refreshTokenHash = hashToken(refreshToken);
+    const sessionData = {
+      sessionId,
+      refreshTokenHash,
+      createdAt: now,
+      lastActivityAt: now,
+      expiresAt,
+      revoked: false,
+      deviceInfo: req.headers?.['user-agent'] || 'Web Browser',
+    };
+
+    await dbStore.users.addSession(newUser.username, sessionData);
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 3 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Account created successfully',
+      token,
+      refreshToken,
+      sessionId,
+      sessionExpiresAt: expiresAt,
+      accessCodeEnabled: false,
+      user: {
+        username: newUser.username,
+        email: newUser.email,
+        role: newUser.role || 'Member',
+        profileImage: newUser.profileImage || 'profile1',
+        avatar: newUser.avatar || 'profile1',
+        accessCodeEnabled: false,
+        createdAt: newUser.createdAt,
+        updatedAt: newUser.updatedAt,
       },
     });
   } catch (error) {
@@ -629,14 +786,19 @@ export const getSessionInfo = async (req, res, next) => {
 // 9. Logout and Revoke Current Session
 export const logout = async (req, res, next) => {
   try {
-    const sessionId = req.session?.sessionId || req.body?.sessionId;
+    const sessionId = req.session?.sessionId || req.body?.sessionId || req.headers['x-session-id'];
     const username = req.user?.username || req.body?.username;
 
     if (username && sessionId) {
       await dbStore.users.revokeSession(username, sessionId);
     }
 
-    res.clearCookie('refreshToken');
+    res.clearCookie('refreshToken', {
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: 'lax',
+      path: '/',
+    });
 
     res.status(200).json({
       success: true,
@@ -651,23 +813,30 @@ export const logout = async (req, res, next) => {
 export const getMe = async (req, res, next) => {
   try {
     const username = req.user?.username;
-    let user = null;
-    if (username) {
-      user = await dbStore.users.findByUsername(username);
-    }
-    if (!user) {
-      const list = await dbStore.users.find();
-      user = list[0];
+    if (!username) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required. Please log in.',
+        errorCode: 'UNAUTHORIZED',
+      });
     }
 
+    const user = await dbStore.users.findByUsername(username);
+
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+      return res.status(401).json({
+        success: false,
+        message: 'Authenticated user account not found or has been deactivated.',
+        errorCode: 'UNAUTHORIZED',
+      });
     }
 
     res.status(200).json({
       success: true,
       user: {
         username: user.username,
+        email: user.email || `${user.username}@shaka.local`,
+        role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
         accessCodeEnabled: Boolean(user.accessCodeEnabled),

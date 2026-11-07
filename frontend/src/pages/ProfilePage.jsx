@@ -371,7 +371,7 @@ export default function ProfilePage() {
               <div className="pt-2 border-t border-[#26262b]/60">
                 <div className="flex items-center justify-center gap-2">
                   <h3 className={`text-lg font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                    {currentUser?.username || 'abdulshamil'}
+                    {currentUser?.username || 'User'}
                   </h3>
                   <button
                     type="button"

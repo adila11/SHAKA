@@ -17,7 +17,6 @@ export default function Navbar() {
     setCurrentScreen,
     currentUser,
     isLoggedIn,
-    setIsLoggedIn,
   } = useFinance();
   const { setTheme, isDark } = useTheme();
 
@@ -39,7 +38,7 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           <button
             type="button"
-            onClick={() => handleNavClick('dashboard')}
+            onClick={() => handleNavClick(isLoggedIn ? 'dashboard' : 'login')}
             className="flex items-center gap-3 text-left group cursor-pointer"
           >
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#c9b27c] to-[#917d50] flex items-center justify-center font-black text-neutral-950 text-base shadow-md shadow-[#c9b27c]/25 select-none transition-transform group-hover:scale-105">
@@ -126,16 +125,15 @@ export default function Navbar() {
               </div>
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => {
-                setIsLoggedIn(true);
-                handleNavClick('dashboard');
-              }}
-              className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#c9b27c] text-neutral-950 hover:bg-[#bba46e] transition-colors"
-            >
-              Log In
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleNavClick('login')}
+                className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-[#c9b27c] text-neutral-950 hover:bg-[#bba46e] transition-colors cursor-pointer"
+              >
+                Log In
+              </button>
+            </div>
           )}
         </div>
       </div>

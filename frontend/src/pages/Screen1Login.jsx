@@ -8,8 +8,8 @@ export default function Screen1Login({ customTheme = null, onNavigate }) {
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  const [username, setUsername] = useState('alex_rivera');
-  const [password, setPassword] = useState('password123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
 
@@ -41,7 +41,7 @@ export default function Screen1Login({ customTheme = null, onNavigate }) {
         </p>
       </div>
 
-      <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleLogin} noValidate className="space-y-4">
         <div>
           <label
             className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${
@@ -60,7 +60,7 @@ export default function Screen1Login({ customTheme = null, onNavigate }) {
                   ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-white border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="Enter username"
+              placeholder="Username"
             />
             <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
               <User className="w-4 h-4" />
@@ -86,7 +86,7 @@ export default function Screen1Login({ customTheme = null, onNavigate }) {
                   ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-white border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="Enter password"
+              placeholder="Password"
             />
             <button
               type="button"

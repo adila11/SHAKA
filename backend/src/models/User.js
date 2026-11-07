@@ -42,6 +42,17 @@ const userSchema = new mongoose.Schema(
       unique: true,
       trim: true,
     },
+    email: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: '',
+    },
+    role: {
+      type: String,
+      enum: ['Admin', 'Member'],
+      default: 'Member',
+    },
     avatar: {
       type: String,
       default: 'profile1',

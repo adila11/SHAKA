@@ -8,7 +8,7 @@ export default function ChangePasswordPage() {
   const { setCurrentScreen } = useFinance();
   const { isDark } = useTheme();
 
-  const [currentPassword, setCurrentPassword] = useState('password123');
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [success, setSuccess] = useState(false);
@@ -73,7 +73,7 @@ export default function ChangePasswordPage() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Current Password
@@ -87,8 +87,7 @@ export default function ChangePasswordPage() {
                   ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="••••••••"
-              required
+              placeholder="Current Password"
             />
           </div>
 
@@ -106,7 +105,6 @@ export default function ChangePasswordPage() {
                   : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
               }`}
               placeholder="Min. 8 chars, 1 uppercase, 1 number"
-              required
             />
           </div>
 
@@ -123,8 +121,7 @@ export default function ChangePasswordPage() {
                   ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="Re-enter new password"
-              required
+              placeholder="Confirm New Password"
             />
           </div>
 

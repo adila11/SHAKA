@@ -8,7 +8,7 @@ export default function ForgotPasswordPage() {
   const { setCurrentScreen } = useFinance();
   const { isDark } = useTheme();
 
-  const [username, setUsername] = useState('alex_rivera');
+  const [username, setUsername] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -56,7 +56,7 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
             <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Username
@@ -71,8 +71,7 @@ export default function ForgotPasswordPage() {
                     ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]'
                     : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
                 }`}
-                placeholder="Enter username"
-                required
+                placeholder="Username"
               />
               <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
                 <Mail className="w-4 h-4" />

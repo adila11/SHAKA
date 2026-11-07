@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { api, setAuthEventHandlers } from '../services/api';
-import { DEFAULT_USER, DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData';
+import { DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData';
 
 const FinanceContext = createContext();
 
@@ -35,11 +35,44 @@ const deduplicateTransactions = (list) => {
 };
 
 export function FinanceProvider({ children }) {
-  const [currentScreen, setCurrentScreen] = useState('dashboard');
+  // Authentication status states: 'INITIALIZING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SERVER_UNAVAILABLE'
+  const [authStatus, setAuthStatus] = useState(() => {
+    if (typeof localStorage !== 'undefined' && !localStorage.getItem('shaka_token') && !localStorage.getItem('shaka_session_id')) {
+      return 'UNAUTHENTICATED';
+    }
+    return 'INITIALIZING';
+  });
+  const [currentUser, setCurrentUser] = useState(null);
+
+  const [currentScreen, setCurrentScreenState] = useState(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const h = window.location.hash.replace('#', '').trim();
+      if (h) return h;
+    }
+    return 'dashboard';
+  });
+
+  const setCurrentScreen = useCallback((screen) => {
+    setCurrentScreenState(screen);
+    if (typeof window !== 'undefined') {
+      window.location.hash = screen;
+    }
+  }, []);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const h = window.location.hash.replace('#', '').trim();
+      if (h) setCurrentScreenState(h);
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
   const [viewMode, setViewMode] = useState('page'); // 'page' | 'all' | 'single'
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [currentUser, setCurrentUser] = useState(DEFAULT_USER);
+
+  // Derived authenticated state
+  const isLoggedIn = authStatus === 'AUTHENTICATED' && currentUser !== null;
 
   // Access Code Security & Session Management state
   const [sessionInfo, setSessionInfo] = useState(null);
@@ -76,6 +109,29 @@ export function FinanceProvider({ children }) {
     }
   }, []);
 
+  // Thoroughly purge all stored tokens, credentials, and session state from browser storage
+  const clearLocalAuthData = useCallback(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('shaka_token');
+      localStorage.removeItem('shaka_refresh_token');
+      localStorage.removeItem('shaka_session_id');
+      localStorage.removeItem('shaka_session_expires_at');
+      // Clean up all other shaka session keys except the theme preference
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('shaka_') && key !== 'shaka_theme') {
+          localStorage.removeItem(key);
+        }
+      }
+    }
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear();
+    }
+    if (typeof document !== 'undefined') {
+      document.cookie = 'refreshToken=; Max-Age=0; path=/; SameSite=Lax';
+    }
+  }, []);
+
   // Listen for Token Expiration & Session Inactivity Expiration
   useEffect(() => {
     setAuthEventHandlers({
@@ -83,22 +139,27 @@ export function FinanceProvider({ children }) {
         setIsAccessCodeModalOpen(true);
       },
       onSessionExpired: (msg) => {
-        localStorage.removeItem('shaka_token');
-        localStorage.removeItem('shaka_refresh_token');
-        localStorage.removeItem('shaka_session_id');
-        setIsLoggedIn(false);
+        clearLocalAuthData();
+        setCurrentUser(null);
+        setSessionInfo(null);
+        setTransactions([]);
+        setBudgetCategories([]);
+        setHouseholdMembers([]);
+        setHouseholdBalances(null);
+        setAuthStatus('UNAUTHENTICATED');
         setSessionExpiryNotice(msg || 'Session expired. Please log in again.');
         setCurrentScreen('login');
       },
     });
-  }, []);
+  }, [setCurrentScreen, clearLocalAuthData]);
 
   // Optimized data fetch with in-flight request deduplication & background preservation
   const refreshData = useCallback(async (options = {}) => {
     if (isFetchingRef.current) return;
-    isFetchingRef.current = true;
+    const token = localStorage.getItem('shaka_token');
+    if (!token) return;
 
-    // Only trigger full skeleton loading if explicitly requested or initial data is absent
+    isFetchingRef.current = true;
     const showSkeleton = options.showLoading ?? false;
     if (showSkeleton) {
       setIsLoading(true);
@@ -143,27 +204,16 @@ export function FinanceProvider({ children }) {
 
       if (membersRes.status === 'fulfilled' && membersRes.value?.success && membersRes.value.data?.length) {
         setHouseholdMembers(membersRes.value.data);
-        const me = membersRes.value.data.find(u => u.username === 'abdulshamil') || membersRes.value.data[0];
-        if (me) setCurrentUser(me);
       }
 
       if (balancesRes.status === 'fulfilled' && balancesRes.value?.success) {
         setHouseholdBalances(balancesRes.value.data || null);
       }
-
-      if (!anySuccess) {
-        const firstError = [txRes, catRes, limitRes, availRes, membersRes, balancesRes].find(
-          r => r.status === 'rejected'
-        );
-        if (firstError) {
-          setError(firstError.reason?.message || 'Failed to sync with backend');
-          setIsBackendConnected(false);
-        }
-      }
     } catch (err) {
       console.warn('Failed to fetch from backend:', err);
-      setError(err.message || 'Unable to connect to backend');
-      setIsBackendConnected(false);
+      if (err.status !== 401) {
+        setIsBackendConnected(false);
+      }
     } finally {
       isFetchingRef.current = false;
       setIsLoading(false);
@@ -171,19 +221,97 @@ export function FinanceProvider({ children }) {
     }
   }, []);
 
-  // Initial load only once on mount
-  useEffect(() => {
-    let ignore = false;
-    async function initLoad() {
-      await refreshData({ showLoading: true });
-      if (!ignore) {
-        fetchSessionInfo();
-      }
+  // Secure Backend Authentication Initialization
+  const initializeAuth = useCallback(async () => {
+    const storedToken = typeof localStorage !== 'undefined' ? localStorage.getItem('shaka_token') : null;
+    const storedSessionId = typeof localStorage !== 'undefined' ? localStorage.getItem('shaka_session_id') : null;
+
+    if (!storedToken && !storedSessionId) {
+      setAuthStatus('UNAUTHENTICATED');
+      setCurrentUser(null);
+      setTransactions([]);
+      setBudgetCategories([]);
+      setHouseholdMembers([]);
+      setHouseholdBalances(null);
+      setSessionInfo(null);
+      return;
     }
 
-    initLoad();
+    try {
+      const res = await api.auth.getMe();
+      if (res && res.success && res.user) {
+        setCurrentUser(res.user);
+        setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
+        setAuthStatus('AUTHENTICATED');
+        setIsBackendConnected(true);
+        await refreshData({ showLoading: false });
+        await fetchSessionInfo();
+      } else {
+        localStorage.removeItem('shaka_token');
+        localStorage.removeItem('shaka_refresh_token');
+        localStorage.removeItem('shaka_session_id');
+        localStorage.removeItem('shaka_session_expires_at');
+        setCurrentUser(null);
+        setAuthStatus('UNAUTHENTICATED');
+      }
+    } catch (err) {
+      if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
+        localStorage.removeItem('shaka_token');
+        localStorage.removeItem('shaka_refresh_token');
+        localStorage.removeItem('shaka_session_id');
+        localStorage.removeItem('shaka_session_expires_at');
+        setCurrentUser(null);
+        setAuthStatus('UNAUTHENTICATED');
+      } else {
+        // Backend server is unreachable or stopped
+        setIsBackendConnected(false);
+        setAuthStatus('SERVER_UNAVAILABLE');
+        setError(err.message || 'Cannot connect to SHAKA secure backend server.');
+      }
+    }
+  }, [refreshData, fetchSessionInfo]);
+
+  // Initial session verification on mount
+  useEffect(() => {
+    let isSubscribed = true;
+    const hasCredentials = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('shaka_token') || localStorage.getItem('shaka_session_id'));
+    if (!hasCredentials) return;
+
+    api.auth.getMe().then(res => {
+      if (!isSubscribed) return;
+      if (res && res.success && res.user) {
+        setCurrentUser(res.user);
+        setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
+        setAuthStatus('AUTHENTICATED');
+        setIsBackendConnected(true);
+        refreshData({ showLoading: false });
+        fetchSessionInfo();
+      } else {
+        localStorage.removeItem('shaka_token');
+        localStorage.removeItem('shaka_refresh_token');
+        localStorage.removeItem('shaka_session_id');
+        localStorage.removeItem('shaka_session_expires_at');
+        setCurrentUser(null);
+        setAuthStatus('UNAUTHENTICATED');
+      }
+    }).catch(err => {
+      if (!isSubscribed) return;
+      if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
+        localStorage.removeItem('shaka_token');
+        localStorage.removeItem('shaka_refresh_token');
+        localStorage.removeItem('shaka_session_id');
+        localStorage.removeItem('shaka_session_expires_at');
+        setCurrentUser(null);
+        setAuthStatus('UNAUTHENTICATED');
+      } else {
+        setIsBackendConnected(false);
+        setAuthStatus('SERVER_UNAVAILABLE');
+        setError(err.message || 'Cannot connect to SHAKA secure backend server.');
+      }
+    });
+
     return () => {
-      ignore = true;
+      isSubscribed = false;
     };
   }, [refreshData, fetchSessionInfo]);
 
@@ -233,9 +361,9 @@ export function FinanceProvider({ children }) {
   const retryConnection = useCallback(async () => {
     setError(null);
     const healthy = await checkHealth();
-    await refreshData({ showLoading: transactions.length === 0 });
+    await initializeAuth();
     return healthy;
-  }, [checkHealth, refreshData, transactions.length]);
+  }, [checkHealth, initializeAuth]);
 
   // Derived financial metrics computed from real data
   const totalSpent = useMemo(() => {
@@ -303,7 +431,7 @@ export function FinanceProvider({ children }) {
         date,
         fullDate,
         time,
-        user: user || currentUser?.username || 'abdulshamil',
+        user: user || currentUser?.username || '',
         isSplit: true,
         authorizationToken,
       });
@@ -359,7 +487,7 @@ export function FinanceProvider({ children }) {
         amount: Number(amount),
         credential,
         credentialType,
-        user: user || currentUser?.username || 'abdulshamil',
+        user: user || currentUser?.username || '',
       });
       return res;
     } catch (err) {
@@ -489,7 +617,7 @@ export function FinanceProvider({ children }) {
           setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
         }
         setSessionExpiryNotice(null);
-        setIsLoggedIn(true);
+        setAuthStatus('AUTHENTICATED');
         setCurrentScreen('dashboard');
         await refreshData({ showLoading: true });
         await fetchSessionInfo();
@@ -497,30 +625,82 @@ export function FinanceProvider({ children }) {
       }
       return { success: false, message: res.message || 'Login failed' };
     } catch (err) {
-      setIsBackendConnected(false);
+      if (err.status !== 401) {
+        setIsBackendConnected(false);
+      }
       return { success: false, message: err.message || 'Login failed' };
     }
   };
 
-  // User logout and session revocation
-  const logout = async () => {
-    const sessionId = localStorage.getItem('shaka_session_id');
+  // User signup / registration via backend API
+  const signup = async ({ username, email, password }) => {
     try {
-      if (sessionId) {
-        await api.auth.logout({ sessionId, username: currentUser?.username });
+      const res = await api.auth.signup({ username, email, password });
+      if (res.success) {
+        setIsBackendConnected(true);
+        if (res.token) {
+          localStorage.setItem('shaka_token', res.token);
+        }
+        if (res.refreshToken) {
+          localStorage.setItem('shaka_refresh_token', res.refreshToken);
+        }
+        if (res.sessionId) {
+          localStorage.setItem('shaka_session_id', res.sessionId);
+        }
+        if (res.sessionExpiresAt) {
+          localStorage.setItem('shaka_session_expires_at', res.sessionExpiresAt);
+        }
+        if (res.user) {
+          setCurrentUser(res.user);
+          setIsAccessCodeEnabled(false);
+        }
+        setSessionExpiryNotice(null);
+        setAuthStatus('AUTHENTICATED');
+        setCurrentScreen('dashboard');
+        await refreshData({ showLoading: true });
+        return { success: true };
       }
-    } catch {
-      // Ignore network errors on logout
-    } finally {
-      localStorage.removeItem('shaka_token');
-      localStorage.removeItem('shaka_refresh_token');
-      localStorage.removeItem('shaka_session_id');
-      localStorage.removeItem('shaka_session_expires_at');
-      setSessionInfo(null);
-      setIsLoggedIn(false);
-      setCurrentScreen('login');
+      return { success: false, message: res.message || 'Registration failed' };
+    } catch (err) {
+      return { success: false, message: err.message || 'Registration failed' };
     }
   };
+
+  // User logout and session revocation
+  const logout = useCallback(async () => {
+    const sessionId = typeof localStorage !== 'undefined' ? localStorage.getItem('shaka_session_id') : null;
+    const userToLogout = currentUser?.username;
+
+    // 1. Immediately wipe all local credentials, tokens, and session ID upfront
+    // This ensures that even if the backend is down or unreachable, the frontend
+    // NEVER retains the session, session ID, or credentials.
+    clearLocalAuthData();
+    setCurrentUser(null);
+    setSessionInfo(null);
+    setTransactions([]);
+    setBudgetCategories([]);
+    setHouseholdMembers([]);
+    setHouseholdBalances(null);
+    setAuthStatus('UNAUTHENTICATED');
+    setCurrentScreen('login');
+    setError(null);
+    setSessionExpiryNotice(null);
+
+    // 2. Best-effort server session revocation (non-blocking if server is offline)
+    if (sessionId) {
+      try {
+        await api.auth.logout({ sessionId, username: userToLogout });
+      } catch {
+        // Server unreachable or connection error: local session is already wiped clean
+      }
+    }
+  }, [currentUser?.username, setCurrentScreen, clearLocalAuthData]);
+
+  const setIsLoggedIn = useCallback((val) => {
+    if (!val) {
+      logout();
+    }
+  }, [logout]);
 
   // Update User Profile (Username & Profile Image)
   const updateProfile = async ({ username: newUsername, avatar, profileImage }) => {
@@ -661,6 +841,10 @@ export function FinanceProvider({ children }) {
   return (
     <FinanceContext.Provider
       value={{
+        authStatus,
+        setAuthStatus,
+        initializeAuth,
+        clearLocalAuthData,
         currentScreen,
         setCurrentScreen,
         navigateTo,
@@ -685,6 +869,7 @@ export function FinanceProvider({ children }) {
         resetAccessCode,
         verifyAccessCode,
         login,
+        signup,
         logout,
         updateProfile,
         transactions,

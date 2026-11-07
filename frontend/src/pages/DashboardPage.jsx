@@ -45,7 +45,7 @@ export default function DashboardPage() {
               <BackendSyncBadge />
             </div>
             <h2 className={`text-2xl sm:text-3xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-              Welcome back, {currentUser?.username || 'abdulshamil'}
+              Welcome back{currentUser?.username ? `, ${currentUser.username}` : ''}
             </h2>
             <p className={`text-xs sm:text-sm mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
               Financial ledger is active • Real-time overview of monthly limits and spending.

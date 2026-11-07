@@ -79,10 +79,17 @@ export async function request(endpoint, options = {}, isRetry = false) {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // 1. Session expired (3-day inactivity or session revoked) -> Force logout
-      if (response.status === 401 && (data.sessionExpired || data.sessionRevoked)) {
-        if (onSessionExpiredCallback) {
-          onSessionExpiredCallback(data.message || 'Session expired. Please log in again.');
+      // 1. Session expired, revoked, or unauthenticated on protected endpoint -> Trigger session expired hook
+      if (
+        response.status === 401 &&
+        endpoint !== '/auth/login' &&
+        endpoint !== '/auth/signup' &&
+        endpoint !== '/auth/refresh'
+      ) {
+        if (data.sessionExpired || data.sessionRevoked || !data.tokenExpired) {
+          if (onSessionExpiredCallback) {
+            onSessionExpiredCallback(data.message || 'Session expired or invalid. Please log in again.');
+          }
         }
       }
 
@@ -232,6 +239,12 @@ export const api = {
         isPublic: true,
         body: JSON.stringify(credentials),
       }),
+    signup: (data) =>
+      request('/auth/signup', {
+        method: 'POST',
+        isPublic: true,
+        body: JSON.stringify(data),
+      }),
     refresh: (data) =>
       request('/auth/refresh', {
         method: 'POST',
@@ -268,6 +281,7 @@ export const api = {
     logout: (data = {}) =>
       request('/auth/logout', {
         method: 'POST',
+        timeout: 3000,
         body: JSON.stringify(data),
       }),
     getMe: () => request('/auth/me'),

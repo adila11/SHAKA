@@ -416,7 +416,7 @@ export default function LogExpensePage() {
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
-      user: currentUser?.username || 'abdulshamil',
+      user: currentUser?.username || '',
     };
 
     // ₹7,000 threshold check: triggers security authorization modal if exceeded

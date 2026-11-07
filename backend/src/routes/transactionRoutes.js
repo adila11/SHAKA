@@ -7,8 +7,12 @@ import {
   deleteTransaction,
   authorizeExpense,
 } from '../controllers/transactionController.js';
+import { protect } from '../middleware/authMiddleware.js';
 
 const router = Router();
+
+// Enforce authentication on all transaction endpoints
+router.use(protect);
 
 router.post('/authorize', authorizeExpense);
 

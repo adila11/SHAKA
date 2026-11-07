@@ -8,16 +8,20 @@ import {
   updateMonthlyLimit,
   getAvailableCategories,
 } from '../controllers/budgetController.js';
+import { protect, requireAdmin } from '../middleware/authMiddleware.js';
 
 const router = Router();
 
+// Enforce authentication on all budget endpoints
+router.use(protect);
+
 router.get('/categories', getBudgetCategories);
-router.post('/categories', addBudgetCategory);
-router.put('/categories/:id', updateBudgetCategory);
-router.delete('/categories/:id', deleteBudgetCategory);
+router.post('/categories', requireAdmin, addBudgetCategory);
+router.put('/categories/:id', requireAdmin, updateBudgetCategory);
+router.delete('/categories/:id', requireAdmin, deleteBudgetCategory);
 
 router.get('/monthly-limit', getMonthlyLimit);
-router.put('/monthly-limit', updateMonthlyLimit);
+router.put('/monthly-limit', requireAdmin, updateMonthlyLimit);
 
 router.get('/available-categories', getAvailableCategories);
 

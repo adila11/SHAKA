@@ -1,7 +1,7 @@
 // Frontend utilities and fallback defaults (all transactions, budget categories, and limits load dynamically from the backend)
 
 export const DEFAULT_USER = {
-  username: 'abdulshamil',
+  username: '',
 };
 
 export const DEFAULT_AVAILABLE_CATEGORIES = [

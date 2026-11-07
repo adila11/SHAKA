@@ -1,8 +1,13 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { ThemeProvider } from './context/ThemeContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
 import ResponsiveLayout from './components/layout/ResponsiveLayout';
 import AccessCodePromptModal from './components/modals/AccessCodePromptModal';
+import {
+  AuthInitializingScreen,
+  ServerUnavailableScreen,
+  AccessDeniedScreen,
+} from './components/common/AuthFeedbackScreens';
 import { ArrowLeft } from 'lucide-react';
 
 // Code-splitting & Lazy Loading for all pages
@@ -27,6 +32,54 @@ function PageLoadingFallback() {
       </span>
     </div>
   );
+}
+
+function ProtectedRoute({ children, requiredRole = null }) {
+  const { authStatus, isLoggedIn, currentUser, retryConnection, setCurrentScreen, error } = useFinance();
+
+  useEffect(() => {
+    if (authStatus === 'UNAUTHENTICATED') {
+      setCurrentScreen('login');
+    }
+  }, [authStatus, setCurrentScreen]);
+
+  if (authStatus === 'INITIALIZING') {
+    return <AuthInitializingScreen />;
+  }
+
+  if (authStatus === 'SERVER_UNAVAILABLE') {
+    return <ServerUnavailableScreen onRetry={retryConnection} errorMsg={error} />;
+  }
+
+  if (authStatus !== 'AUTHENTICATED' || !isLoggedIn || !currentUser) {
+    return <LoginPage />;
+  }
+
+  if (requiredRole && currentUser.role !== requiredRole) {
+    return <AccessDeniedScreen requiredRole={requiredRole} userRole={currentUser?.role} />;
+  }
+
+  return children;
+}
+
+function PublicRoute({ children }) {
+  const { authStatus, isLoggedIn, setCurrentScreen } = useFinance();
+
+  useEffect(() => {
+    if (authStatus === 'AUTHENTICATED' && isLoggedIn) {
+      setCurrentScreen('dashboard');
+    }
+  }, [authStatus, isLoggedIn, setCurrentScreen]);
+
+  if (authStatus === 'INITIALIZING') {
+    return <AuthInitializingScreen />;
+  }
+
+  if (authStatus === 'AUTHENTICATED' && isLoggedIn) {
+    return <DashboardPage />;
+  }
+
+  return children;
 }
 
 function PageRouter() {
@@ -56,28 +109,58 @@ function PageRouter() {
     );
   }
 
-  // Proper responsive page layout (default) with lazy-loaded routes
+  // Proper responsive page layout with protected & public route enforcement
   const renderCurrentPage = () => {
     switch (currentScreen) {
       case 'dashboard':
-        return <DashboardPage />;
+        return (
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        );
       case 'ledger':
-        return <LedgerPage />;
+        return (
+          <ProtectedRoute>
+            <LedgerPage />
+          </ProtectedRoute>
+        );
       case 'add-expense':
       case 'log-expense':
-        return <LogExpensePage />;
+        return (
+          <ProtectedRoute>
+            <LogExpensePage />
+          </ProtectedRoute>
+        );
       case 'budget':
-        return <BudgetPage />;
+        return (
+          <ProtectedRoute>
+            <BudgetPage />
+          </ProtectedRoute>
+        );
       case 'profile':
-        return <ProfilePage />;
+        return (
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        );
+      case 'signup':
+      case 'register':
       case 'login':
-        return <LoginPage />;
+        return (
+          <PublicRoute>
+            <LoginPage />
+          </PublicRoute>
+        );
       case 'forgot':
         return <ForgotPasswordPage />;
       case 'change-pass':
         return <ChangePasswordPage />;
       default:
-        return <DashboardPage />;
+        return (
+          <ProtectedRoute>
+            <DashboardPage />
+          </ProtectedRoute>
+        );
     }
   };
 
