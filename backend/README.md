@@ -26,7 +26,7 @@ npm install
 ```bash
 npm run dev
 ```
-The server will start on `http://localhost:5000` with hot-reloading. On startup, it automatically seeds initial mock data (users, transactions, budget categories, limits) directly into MongoDB if collections are empty.
+The server will start on `http://localhost:5000` with hot-reloading and directly connects to the existing MongoDB database without inserting predefined records.
 
 ---
 

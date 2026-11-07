@@ -4,17 +4,11 @@ import { User } from '../models/User.js';
 import { Transaction } from '../models/Transaction.js';
 import { BudgetCategory } from '../models/BudgetCategory.js';
 import { AdminPasswordResetRequest } from '../models/AdminPasswordResetRequest.js';
-import { INITIAL_DATA } from './initialData.js';
-
-// In-memory memory mirror initialized with exact requested users and initial data
+// In-memory active fallback store (used only if MongoDB is unreachable)
 const memState = {
-  users: JSON.parse(JSON.stringify(INITIAL_DATA.users)).map(u => ({
-    ...u,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  })),
+  users: [],
   transactions: [],
-  budgetCategories: JSON.parse(JSON.stringify(INITIAL_DATA.budgetCategories)),
+  budgetCategories: [],
   adminPasswordResetRequests: [],
 };
 
@@ -722,7 +716,7 @@ export const dbStore = {
             icon: 'Tag',
           }));
         }
-        return INITIAL_DATA.availableCategories;
+        return [];
       }
       if (memState.budgetCategories && memState.budgetCategories.length > 0) {
         return memState.budgetCategories.map(c => ({
@@ -731,7 +725,7 @@ export const dbStore = {
           icon: 'Tag',
         }));
       }
-      return INITIAL_DATA.availableCategories;
+      return [];
     },
     addAvailableCategory: async (cat) => {
       // Categories are dynamically stored in BudgetCategory; no separate settings collection needed

