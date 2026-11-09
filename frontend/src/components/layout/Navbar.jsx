@@ -7,11 +7,9 @@ import {
   Moon,
   Sun,
   Bell,
-  Download,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
-import { usePWA } from '../../context/PWAContext';
 import { getProfileImageUrl } from '../../data/financeData';
 
 export default function Navbar() {
@@ -24,7 +22,6 @@ export default function Navbar() {
     setIsReviewResetModalOpen,
   } = useFinance();
   const { toggleTheme, isDark } = useTheme();
-  const { isInstalled, installApp } = usePWA();
 
   const navLinks = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -38,10 +35,19 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b transition-colors backdrop-blur-md bg-[#0e0e10]/90 dark:bg-[#0e0e10]/90 border-[#26262b] dark:border-[#26262b]">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <header
+      className={`sticky top-0 z-40 w-full border-b backdrop-blur-md transition-colors ${
+        isDark
+          ? 'bg-[#0e0e10]/95 border-[#26262b] text-[#e8e8ea]'
+          : 'bg-[#f6f5f2]/95 border-[#e5e3dc] text-[#18181b]'
+      }`}
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)',
+      }}
+    >
+      <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3 sm:gap-4">
         {/* Brand identity */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => handleNavClick(isLoggedIn ? 'dashboard' : 'login')}
@@ -92,16 +98,16 @@ export default function Navbar() {
         )}
 
         {/* Actions & Utilities */}
-        <div className="flex items-center gap-2.5">
-          {/* Quick Add Expense Button */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Quick Add Expense Button (hidden on mobile since MobileNav has prominent + button) */}
           {isLoggedIn && (
             <button
               type="button"
               onClick={() => handleNavClick('add-expense')}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+              className="hidden sm:flex px-3.5 py-2 rounded-xl bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.02] active:scale-[0.98] transition-all items-center gap-1.5 cursor-pointer"
             >
               <Plus className="w-4 h-4 stroke-[3]" />
-              <span className="hidden sm:inline">Add Expense</span>
+              <span>Add Expense</span>
             </button>
           )}
 
@@ -123,19 +129,6 @@ export default function Navbar() {
                   {pendingAdminRequestsCount}
                 </span>
               )}
-            </button>
-          )}
-
-          {/* Install Application Button (Hidden when already installed) */}
-          {!isInstalled && (
-            <button
-              type="button"
-              title="Install SHAKA application on your device"
-              onClick={installApp}
-              className="px-2.5 py-1.5 rounded-xl border border-[#c9b27c]/40 bg-[#17171a] text-[#c9b27c] hover:bg-[#c9b27c]/15 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-[#c9b27c]/10"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Install</span>
             </button>
           )}
 
