@@ -35,9 +35,18 @@ export default function AddExpenseModal() {
   const { isAddExpenseModalOpen, setIsAddExpenseModalOpen, addExpense, setCurrentScreen, availableCategories } = useFinance();
   const { isDark } = useTheme();
 
-  const [amount, setAmount] = useState('750');
-  const [selectedCategory, setSelectedCategory] = useState('Food');
-  const [description, setDescription] = useState('Coffee & Workspace with Sam');
+  // Only show existing categories; if none exist, show 'None'
+  const displayedCategories = availableCategories && availableCategories.length > 0
+    ? availableCategories
+    : [{ name: 'None', color: '#8a8a93', icon: 'Tag' }];
+
+  const [amount, setAmount] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [description, setDescription] = useState('');
+
+  const activeCategory = (selectedCategory && displayedCategories.some(c => c.name.toLowerCase() === selectedCategory.toLowerCase()))
+    ? selectedCategory
+    : displayedCategories[0].name;
 
   // Date Selection: 'today' | 'yesterday' | 'calendar'
   const [dateOption, setDateOption] = useState('today');
@@ -79,7 +88,7 @@ export default function AddExpenseModal() {
     if (!val || typeof val !== 'string' || !val.trim()) {
       return 'Category is required.';
     }
-    const exists = availableCategories.some(
+    const exists = displayedCategories.some(
       (c) => c.name.toLowerCase() === val.trim().toLowerCase()
     );
     if (!exists) {
@@ -138,7 +147,7 @@ export default function AddExpenseModal() {
     if (e && e.preventDefault) e.preventDefault();
 
     const amountErr = validateAmount(amount);
-    const catErr = validateCategory(selectedCategory);
+    const catErr = validateCategory(activeCategory);
     const descErr = validateDescription(description);
     const dateErr = validateDate(selectedDateObj);
 
@@ -159,8 +168,8 @@ export default function AddExpenseModal() {
 
     const expensePayload = {
       amount: numAmount,
-      category: selectedCategory,
-      description: description.trim() || `${selectedCategory} expense`,
+      category: activeCategory,
+      description: description.trim() || `${activeCategory} expense`,
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
@@ -393,8 +402,8 @@ export default function AddExpenseModal() {
               Category
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {availableCategories.map((cat) => {
-                const isSelected = selectedCategory === cat.name;
+              {displayedCategories.map((cat) => {
+                const isSelected = activeCategory === cat.name;
                 return (
                   <button
                     key={cat.name}

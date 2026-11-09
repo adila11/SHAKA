@@ -62,10 +62,16 @@ export default function LogExpensePage() {
   const [isFormCollapsed, setIsFormCollapsed] = useState(false);
 
   // Form input states (preserved when expanding/collapsing)
+  // Only show existing categories; if none exist, show 'None'
+  const displayedCategories = availableCategories && availableCategories.length > 0
+    ? availableCategories
+    : [{ name: 'None', color: '#8a8a93', icon: 'Tag' }];
+
   const [amount, setAmount] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(
-    availableCategories[0]?.name || 'Food'
-  );
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const activeCategory = (selectedCategory && displayedCategories.some(c => c.name.toLowerCase() === selectedCategory.toLowerCase()))
+    ? selectedCategory
+    : displayedCategories[0].name;
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
@@ -309,7 +315,7 @@ export default function LogExpensePage() {
     if (!val || typeof val !== 'string' || !val.trim()) {
       return 'Category selection is mandatory.';
     }
-    const exists = availableCategories.some(
+    const exists = displayedCategories.some(
       c => c.name.toLowerCase() === val.trim().toLowerCase()
     );
     if (!exists) {
@@ -389,7 +395,7 @@ export default function LogExpensePage() {
 
     // Validate all form fields with custom JavaScript
     const amountErr = validateAmount(amount);
-    const categoryErr = validateCategory(selectedCategory);
+    const categoryErr = validateCategory(activeCategory);
     const descriptionErr = validateDescription(description);
     const dateErr = validateDate(selectedDate);
 
@@ -410,8 +416,8 @@ export default function LogExpensePage() {
 
     const expensePayload = {
       amount: numAmount,
-      category: selectedCategory,
-      description: description.trim() || `${selectedCategory} expense`,
+      category: activeCategory,
+      description: description.trim() || `${activeCategory} expense`,
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
@@ -733,7 +739,7 @@ export default function LogExpensePage() {
                   </label>
                   <div className="relative">
                     <select
-                      value={selectedCategory}
+                      value={activeCategory}
                       onChange={(e) => {
                         setSelectedCategory(e.target.value);
                         if (errors.category) {
@@ -748,7 +754,7 @@ export default function LogExpensePage() {
                           : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b] focus:border-[#c9b27c]'
                       } ${isDark ? 'bg-[#0e0e10] text-[#e8e8ea]' : 'bg-[#f6f5f2] text-[#18181b]'}`}
                     >
-                      {availableCategories.map((cat) => (
+                      {displayedCategories.map((cat) => (
                         <option
                           key={cat.name}
                           value={cat.name}

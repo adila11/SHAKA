@@ -244,8 +244,16 @@ export function FinanceProvider({ children }) {
         setMonthlyLimitState(limitRes.value.monthlyLimit || 0);
       }
 
-      if (availRes?.status === 'fulfilled' && availRes.value?.success && availRes.value.data?.length) {
-        setAvailableCategories(availRes.value.data);
+      if (availRes?.status === 'fulfilled' && availRes.value?.success) {
+        setAvailableCategories(availRes.value.data || []);
+      } else if (catRes?.status === 'fulfilled' && catRes.value?.success) {
+        setAvailableCategories(
+          (catRes.value.data || []).map(c => ({
+            name: c.name || c.category,
+            color: c.color || '#c9b27c',
+            icon: 'Tag',
+          }))
+        );
       }
 
       if (membersRes?.status === 'fulfilled' && membersRes.value?.success && membersRes.value.data?.length) {

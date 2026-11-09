@@ -4,14 +4,7 @@ export const DEFAULT_USER = {
   username: '',
 };
 
-export const DEFAULT_AVAILABLE_CATEGORIES = [
-  { name: 'Food', icon: 'Utensils', color: '#c9b27c' },
-  { name: 'Rent', icon: 'Home', color: '#8fb39a' },
-  { name: 'Travel', icon: 'Navigation', color: '#c9b27c' },
-  { name: 'Bills', icon: 'Receipt', color: '#d4a359' },
-  { name: 'Shopping', icon: 'ShoppingBag', color: '#8a8a93' },
-  { name: 'Health', icon: 'HeartPulse', color: '#8fb39a' },
-];
+export const DEFAULT_AVAILABLE_CATEGORIES = [];
 
 export const AVAILABLE_CATEGORIES = DEFAULT_AVAILABLE_CATEGORIES;
 

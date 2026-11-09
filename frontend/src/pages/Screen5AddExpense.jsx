@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { X, Check, Calendar } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
-import { AVAILABLE_CATEGORIES } from '../data/financeData';
 
 const getTodayDate = () => new Date();
 const getYesterdayDate = () => {
@@ -32,13 +31,21 @@ const toFormattedDates = (dateObj) => {
 };
 
 export default function Screen5AddExpense({ customTheme = null, onNavigate, onClose }) {
-  const { addExpense, navigateTo } = useFinance();
+  const { addExpense, navigateTo, availableCategories } = useFinance();
   const { isDark: globalDark } = useTheme();
   const isDark = customTheme ? customTheme === 'dark' : globalDark;
 
-  const [amount, setAmount] = useState('750');
-  const [selectedCategory, setSelectedCategory] = useState('Food');
-  const [description, setDescription] = useState('Coffee with Sam');
+  const displayedCategories = availableCategories && availableCategories.length > 0
+    ? availableCategories
+    : [{ name: 'None', color: '#8a8a93', icon: 'Tag' }];
+
+  const [amount, setAmount] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [description, setDescription] = useState('');
+
+  const activeCategory = (selectedCategory && displayedCategories.some(c => c.name.toLowerCase() === selectedCategory.toLowerCase()))
+    ? selectedCategory
+    : displayedCategories[0].name;
 
   // Date Selection: 'today' | 'yesterday' | 'calendar'
   const [dateOption, setDateOption] = useState('today');
@@ -69,8 +76,8 @@ export default function Screen5AddExpense({ customTheme = null, onNavigate, onCl
 
     const res = await addExpense({
       amount: Number(amount),
-      category: selectedCategory,
-      description: description || `${selectedCategory} expense`,
+      category: activeCategory,
+      description: description || `${activeCategory} expense`,
       date: shortDate,
       fullDate,
       time: dateOption === 'today' ? 'Just now' : '12:00 PM',
@@ -238,8 +245,8 @@ export default function Screen5AddExpense({ customTheme = null, onNavigate, onCl
             Category
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {AVAILABLE_CATEGORIES.map((cat) => {
-              const isSelected = selectedCategory === cat.name;
+            {displayedCategories.map((cat) => {
+              const isSelected = activeCategory === cat.name;
               return (
                 <button
                   key={cat.name}
