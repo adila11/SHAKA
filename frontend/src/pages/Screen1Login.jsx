@@ -30,8 +30,8 @@ export default function Screen1Login({ customTheme = null, onNavigate }) {
   return (
     <div className="flex-1 px-6 flex flex-col justify-center">
       <div className="mb-8 text-center">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[#c9b27c] to-[#967f4c] flex items-center justify-center shadow-lg shadow-[#c9b27c]/20 select-none">
-          <span className="text-neutral-950 font-extrabold text-2xl tracking-tighter">S</span>
+        <div className="w-16 h-16 mx-auto mb-4 rounded-2xl overflow-hidden flex items-center justify-center shadow-lg shadow-[#c9b27c]/20 select-none border border-[#c9b27c]/30 bg-[#17171a]">
+          <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-1" />
         </div>
         <h2 className={`text-2xl font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
           SHAKA

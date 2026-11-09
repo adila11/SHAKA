@@ -53,8 +53,8 @@ export default function LoginPage() {
       >
         {/* Brand Monogram */}
         <div className="text-center mb-7">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#c9b27c] to-[#917d50] flex items-center justify-center font-black text-neutral-950 text-2xl mx-auto mb-3 shadow-lg shadow-[#c9b27c]/25 select-none">
-            S
+          <div className="w-16 h-16 rounded-2xl overflow-hidden mx-auto mb-3 shadow-lg shadow-[#c9b27c]/25 select-none flex items-center justify-center bg-[#17171a] border border-[#c9b27c]/30">
+            <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-1" />
           </div>
           <h2 className={`text-2xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
             SHAKA

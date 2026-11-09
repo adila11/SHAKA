@@ -21,8 +21,8 @@ export default function ShakaHeader() {
     <header className="w-full max-w-7xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 bg-neutral-900/90 dark:bg-[#17171a]/95 border border-neutral-800 dark:border-[#26262b] p-4 rounded-2xl shadow-xl backdrop-blur-md sticky top-4 z-50">
       {/* Brand Identity */}
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#c9b27c] to-[#917d50] flex items-center justify-center font-black text-neutral-950 text-xl shadow-lg shadow-[#c9b27c]/25 select-none">
-          S
+        <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center select-none shadow-lg shadow-[#c9b27c]/25 border border-[#c9b27c]/30 bg-[#17171a] shrink-0">
+          <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-0.5" />
         </div>
         <div>
           <h1 className="text-lg font-bold text-neutral-100 dark:text-[#e8e8ea] tracking-tight flex items-center gap-2">

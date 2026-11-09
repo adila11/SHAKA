@@ -44,8 +44,8 @@ export default function Navbar() {
             onClick={() => handleNavClick(isLoggedIn ? 'dashboard' : 'login')}
             className="flex items-center gap-3 text-left group cursor-pointer"
           >
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#c9b27c] to-[#917d50] flex items-center justify-center font-black text-neutral-950 text-base shadow-md shadow-[#c9b27c]/25 select-none transition-transform group-hover:scale-105">
-              S
+            <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center select-none shadow-md shadow-[#c9b27c]/20 transition-transform group-hover:scale-105 border border-[#c9b27c]/30 bg-[#17171a] shrink-0">
+              <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-0.5" />
             </div>
             <div>
               <div className="flex items-center gap-2">

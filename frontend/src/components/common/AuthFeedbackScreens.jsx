@@ -13,8 +13,8 @@ export function AuthInitializingScreen() {
         isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'
       }`}
     >
-      <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#c9b27c] to-[#917d50] text-neutral-950 flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[#c9b27c]/25 select-none animate-pulse">
-        <span className="font-black text-2xl">S</span>
+      <div className="w-16 h-16 rounded-3xl overflow-hidden border border-[#c9b27c]/40 bg-[#17171a] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-[#c9b27c]/25 select-none animate-pulse">
+        <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-1" />
       </div>
       <h2 className="text-xl font-extrabold tracking-tight mb-2">
         Authenticating Secure Session

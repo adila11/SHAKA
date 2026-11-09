@@ -186,7 +186,7 @@ SHAKA/
 │
 ├── frontend/
 │   ├── public/
-│   │   ├── favicon.svg
+│   │   ├── Logo.png
 │   │   ├── icons.svg
 │   │   ├── profile1.jpg
 │   │   └── profile2.jpg

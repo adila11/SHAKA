@@ -243,6 +243,7 @@ export default function ForgotPasswordPage() {
         {/* Header Monogram & Title */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
+            <img src="/Logo.png" alt="SHAKA Logo" className="w-5 h-5 object-contain rounded" />
             <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#c9b27c]/15 text-[#c9b27c] border border-[#c9b27c]/30 font-bold uppercase tracking-wider">
               Two-Admin Approval
             </span>

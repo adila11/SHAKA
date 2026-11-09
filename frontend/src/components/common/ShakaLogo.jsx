@@ -9,9 +9,9 @@ export default function ShakaLogo({ size = 'md', showText = false, textSubtitle 
   return (
     <div className="flex items-center gap-2.5">
       <div
-        className={`${sizeClasses} bg-gradient-to-br from-[#c9b27c] to-[#967f4c] flex items-center justify-center font-extrabold text-neutral-950 shadow-md shadow-[#c9b27c]/20 shrink-0 select-none`}
+        className={`${sizeClasses} overflow-hidden flex items-center justify-center shadow-md shadow-[#c9b27c]/20 shrink-0 select-none border border-[#c9b27c]/30 bg-[#17171a]`}
       >
-        S
+        <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-0.5" />
       </div>
       {showText && (
         <div className="text-left">

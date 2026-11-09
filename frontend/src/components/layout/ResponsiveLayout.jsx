@@ -27,7 +27,7 @@ export default function ResponsiveLayout({ children }) {
       <footer className="hidden md:block w-full border-t border-[#26262b]/80 py-6 text-xs text-[#8a8a93] transition-colors">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-[#c9b27c]" />
+            <img src="/Logo.png" alt="SHAKA Logo" className="w-4 h-4 object-contain rounded" />
             <span>SHAKA • Structure Your Spend. Elevate Your Wealth.</span>
           </div>
           <div>

@@ -28,8 +28,8 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
       }`}
     >
       <div className="flex items-center gap-2.5">
-        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#c9b27c] to-[#967f4c] flex items-center justify-center text-neutral-950 font-bold text-xs select-none shadow-sm shadow-[#c9b27c]/20">
-          S
+        <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center select-none shadow-sm shadow-[#c9b27c]/20 border border-[#c9b27c]/30 bg-[#17171a] shrink-0">
+          <img src="/Logo.png" alt="SHAKA Logo" className="w-full h-full object-contain p-0.5" />
         </div>
         <div className="flex items-center gap-1.5">
           <span className={`font-bold text-sm tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
