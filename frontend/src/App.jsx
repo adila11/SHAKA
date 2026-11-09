@@ -3,10 +3,13 @@ import { BrowserRouter, Routes, Route } from './router/BrowserRouter';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { FinanceProvider, useFinance } from './context/FinanceContext';
+import { PWAProvider } from './context/PWAContext';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import ResponsiveLayout from './components/layout/ResponsiveLayout';
 import AccessCodePromptModal from './components/modals/AccessCodePromptModal';
 import AdminPasswordResetApprovalModal from './components/modals/AdminPasswordResetApprovalModal';
+import InstallPwaModal from './components/pwa/InstallPwaModal';
+import PwaUpdateNotification from './components/pwa/PwaUpdateNotification';
 import {
   AuthInitializingScreen,
   ServerUnavailableScreen,
@@ -215,6 +218,8 @@ function PageRouter() {
         isOpen={isReviewResetModalOpen}
         onClose={() => setIsReviewResetModalOpen(false)}
       />
+      <InstallPwaModal />
+      <PwaUpdateNotification />
     </ResponsiveLayout>
   );
 }
@@ -226,7 +231,9 @@ export default function App() {
         <ThemeProvider>
           <ToastProvider>
             <FinanceProvider>
-              <PageRouter />
+              <PWAProvider>
+                <PageRouter />
+              </PWAProvider>
             </FinanceProvider>
           </ToastProvider>
         </ThemeProvider>

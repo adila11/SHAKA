@@ -71,6 +71,14 @@ SHAKA solves the problem of shared household, partner, and collaborative financi
 - **Optimistic UI Updates with Snapshot Rollback**: Immediate UI response for category and transaction mutations; automatically restores previous state snapshots with sanitized toast notifications if server validation fails.
 - **Action Locking**: Prevents double-submission and request spamming on asynchronous buttons.
 
+### Progressive Web App (PWA) & Offline Capabilities
+- **Full Installability**: Native `beforeinstallprompt` support and custom in-app install modal with step-by-step guides for iOS Safari, Android, and Desktop (Chrome/Edge/Brave).
+- **W3C Web App Manifest**: Complete metadata with `standalone` display mode, maskable and high-resolution icons (192px, 512px, Apple touch icon), and OS shortcuts for quick expense logging.
+- **Service Worker Lifecycle**: Static asset pre-caching, app shell offline delivery, stale-while-revalidate for assets, and automatic cleanup of outdated cache versions.
+- **Offline Fallback & Connectivity Status**: Custom branded offline page (`offline.html`) and real-time network reconnection banner with live network status indicator.
+- **Sensitive Data Security**: Strictly excludes API mutating requests and private authorization tokens from persistent caches.
+- **Instant In-App Updates**: Background update detection with a non-intrusive floating notification and instant reload activation via `SKIP_WAITING`.
+
 ---
 
 ## 3. Technology Stack
@@ -187,6 +195,13 @@ SHAKA/
 ├── frontend/
 │   ├── public/
 │   │   ├── Logo.png
+│   │   ├── icon-192.png              # PWA application icon (192x192)
+│   │   ├── icon-512.png              # PWA high-res icon (512x512)
+│   │   ├── icon-maskable-512.png     # Android adaptive maskable icon
+│   │   ├── apple-touch-icon.png      # iOS Safari home screen icon
+│   │   ├── manifest.webmanifest      # W3C Web App Manifest
+│   │   ├── offline.html              # Custom offline fallback view
+│   │   ├── sw.js                     # Cache-first & stale-while-revalidate Service Worker
 │   │   ├── icons.svg
 │   │   ├── profile1.jpg
 │   │   └── profile2.jpg
@@ -197,10 +212,12 @@ SHAKA/
 │   │   │   ├── common/                   # Skeleton, CategoryBadge, ErrorBoundary, ShakaLogo
 │   │   │   ├── layout/                   # Navbar, MobileNav, ShakaHeader, ResponsiveLayout
 │   │   │   ├── modals/                   # AddExpenseModal, ExpenseAuthorizationModal, ResetModals
+│   │   │   ├── pwa/                      # InstallPwaModal, OfflineBanner, PwaUpdateNotification
 │   │   │   ├── showcase/                 # AllScreensGallery (optional 8-screen showcase)
 │   │   │   └── widgets/                  # MonthlyLimitWidget, DonutSpendWidget, StatCardsWidget
 │   │   ├── context/
 │   │   │   ├── FinanceContext.jsx        # Shared financial state, optimistic CRUD, and sync
+│   │   │   ├── PWAContext.jsx            # PWA lifecycle, native install prompts, and update management
 │   │   │   ├── ThemeContext.jsx          # Circular reveal View Transitions & theme state
 │   │   │   └── ToastContext.jsx          # Accessible deduplicated notifications
 │   │   ├── data/

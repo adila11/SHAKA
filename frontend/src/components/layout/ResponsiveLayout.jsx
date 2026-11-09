@@ -1,17 +1,24 @@
 import Navbar from './Navbar';
 import MobileNav from './MobileNav';
+import OfflineBanner from '../pwa/OfflineBanner';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
+import { usePWA } from '../../context/PWAContext';
+import { Download } from 'lucide-react';
 
 export default function ResponsiveLayout({ children }) {
   const { isLoggedIn } = useFinance();
   const { isDark } = useTheme();
+  const { isInstalled, installApp } = usePWA();
 
   return (
     <div
       className={`min-h-screen flex flex-col font-sans transition-colors ${isDark ? 'bg-[#0e0e10] text-[#e8e8ea]' : 'bg-[#f6f5f2] text-[#18181b]'
         }`}
     >
+      {/* Offline Status Banner */}
+      <OfflineBanner />
+
       {/* Top Navbar */}
       <Navbar />
 
@@ -30,7 +37,17 @@ export default function ResponsiveLayout({ children }) {
             <img src="/Logo.png" alt="SHAKA Logo" className="w-4 h-4 object-contain rounded" />
             <span>SHAKA • Structure Your Spend. Elevate Your Wealth.</span>
           </div>
-          <div>
+          <div className="flex items-center gap-4">
+            {!isInstalled && (
+              <button
+                type="button"
+                onClick={installApp}
+                className="text-[#c9b27c] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Install Web App</span>
+              </button>
+            )}
             <span>Created By Shaka 2026</span>
           </div>
         </div>

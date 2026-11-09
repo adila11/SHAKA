@@ -19,9 +19,13 @@ import {
   Pencil,
   UserCheck,
   Clock,
+  Download,
+  Smartphone,
+  Sparkles,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
+import { usePWA } from '../context/PWAContext';
 import ProfilePictureModal from '../components/modals/ProfilePictureModal';
 import EditUserModal from '../components/modals/EditUserModal';
 import { getProfileImageUrl } from '../data/financeData';
@@ -46,6 +50,7 @@ export default function ProfilePage() {
     setSelectedResetRequest,
   } = useFinance();
   const { isDark, toggleTheme } = useTheme();
+  const { isInstalled, installApp, updateAvailable, applyUpdate, setIsInstallModalOpen } = usePWA();
 
   // Modal dialog states: null | 'enable' | 'change' | 'disable' | 'view_reset'
   const [modalType, setModalType] = useState(null);
@@ -691,7 +696,86 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Section 4: Session Control */}
+          {/* Section 4: Progressive Web App & Offline */}
+          <div
+            className={`p-6 rounded-2xl border transition-colors shadow-sm ${
+              isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-[#c9b27c]/15 text-[#c9b27c] flex items-center justify-center">
+                  <Smartphone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                    Progressive Web App
+                  </h4>
+                  <p className={`text-xs mt-0.5 ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    Native desktop &amp; mobile client integration
+                  </p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                isInstalled
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                  : 'bg-[#c9b27c]/15 text-[#c9b27c] border-[#c9b27c]/30'
+              }`}>
+                {isInstalled ? 'INSTALLED PWA' : 'BROWSER MODE'}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-xs py-2 border-b border-[#26262b]/40">
+                <span className={isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}>Offline Cache Status</span>
+                <span className="font-semibold text-emerald-400 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  App Shell Pre-cached
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs py-2 border-b border-[#26262b]/40">
+                <span className={isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}>Application Version</span>
+                <span className="font-mono text-[#c9b27c]">v1.0.0 (Production PWA)</span>
+              </div>
+              
+              <div className="pt-2 flex flex-wrap items-center gap-3">
+                {!isInstalled ? (
+                  <button
+                    type="button"
+                    onClick={installApp}
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#c9b27c] to-[#a68d55] text-neutral-950 font-bold text-xs shadow-md shadow-[#c9b27c]/20 hover:scale-[1.01] active:scale-[0.99] transition-all flex items-center gap-2 cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Install Application</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsInstallModalOpen(true)}
+                    className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-1.5 cursor-pointer transition-colors ${
+                      isDark ? 'border-[#26262b] bg-[#202024] text-[#e8e8ea] hover:bg-[#26262c]' : 'border-[#e5e3dc] bg-[#f8f7f4] text-[#18181b]'
+                    }`}
+                  >
+                    <Smartphone className="w-3.5 h-3.5 text-[#c9b27c]" />
+                    <span>Device Info &amp; Guide</span>
+                  </button>
+                )}
+
+                {updateAvailable && (
+                  <button
+                    type="button"
+                    onClick={applyUpdate}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-xs flex items-center gap-2 hover:bg-emerald-500/30 transition-all cursor-pointer"
+                  >
+                    <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
+                    <span>Update Ready — Restart</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Section 5: Session Control */}
           <div
             className={`p-5 rounded-2xl border border-[#d97070]/30 bg-[#d97070]/5 transition-colors shadow-sm`}
           >

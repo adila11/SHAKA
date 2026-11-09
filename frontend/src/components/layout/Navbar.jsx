@@ -7,9 +7,11 @@ import {
   Moon,
   Sun,
   Bell,
+  Download,
 } from 'lucide-react';
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
+import { usePWA } from '../../context/PWAContext';
 import { getProfileImageUrl } from '../../data/financeData';
 
 export default function Navbar() {
@@ -22,6 +24,7 @@ export default function Navbar() {
     setIsReviewResetModalOpen,
   } = useFinance();
   const { toggleTheme, isDark } = useTheme();
+  const { isInstalled, installApp } = usePWA();
 
   const navLinks = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -120,6 +123,19 @@ export default function Navbar() {
                   {pendingAdminRequestsCount}
                 </span>
               )}
+            </button>
+          )}
+
+          {/* Install Application Button (Hidden when already installed) */}
+          {!isInstalled && (
+            <button
+              type="button"
+              title="Install SHAKA application on your device"
+              onClick={installApp}
+              className="px-2.5 py-1.5 rounded-xl border border-[#c9b27c]/40 bg-[#17171a] text-[#c9b27c] hover:bg-[#c9b27c]/15 text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer shadow-sm shadow-[#c9b27c]/10"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">Install</span>
             </button>
           )}
 
