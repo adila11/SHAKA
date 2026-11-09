@@ -4,6 +4,7 @@ export const getMembers = async (req, res, next) => {
   try {
     const users = await dbStore.users.find();
     const safeUsers = users.map(u => ({
+      name: u.name || u.username,
       username: u.username,
       email: u.email,
       role: u.role || 'Member',
@@ -30,7 +31,8 @@ export const getBalances = async (req, res, next) => {
     const equalShare = Math.round(totalSplit / memberCount);
 
     const balances = users.map(u => ({
-      name: u.username,
+      name: u.name || u.username,
+      username: u.username,
       paid: 0,
       equalShare,
       net: 0,

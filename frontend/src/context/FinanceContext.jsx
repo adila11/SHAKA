@@ -1139,8 +1139,8 @@ export function FinanceProvider({ children }) {
     }
   }, [logout]);
 
-  // Update User Profile (Username & Profile Image) with Optimistic UI & Automatic Rollback
-  const updateProfile = async ({ username: newUsername, avatar, profileImage }) => {
+  // Update User Profile (Name, Username & Profile Image) with Optimistic UI & Automatic Rollback
+  const updateProfile = async ({ name, username: newUsername, avatar, profileImage }) => {
     const previousUser = currentUser ? { ...currentUser } : null;
     const lockKey = 'profile-update';
     if (pendingActionIds.has(lockKey)) return { success: false, message: 'Profile update in progress' };
@@ -1148,6 +1148,7 @@ export function FinanceProvider({ children }) {
     setPendingActionIds(prev => new Set(prev).add(lockKey));
 
     const payload = {};
+    if (name !== undefined) payload.name = name;
     if (newUsername !== undefined) payload.username = newUsername;
     if (avatar !== undefined) payload.avatar = avatar;
     if (profileImage !== undefined) payload.profileImage = profileImage;
@@ -1175,6 +1176,7 @@ export function FinanceProvider({ children }) {
             m.username === currentUser?.username || (newUsername && m.username === newUsername)
               ? {
                   ...m,
+                  name: res.user?.name !== undefined ? res.user.name : (name || m.name),
                   username: newUsername || m.username,
                   avatar: res.user?.avatar !== undefined ? res.user.avatar : m.avatar,
                   profileImage: res.user?.profileImage !== undefined ? res.user.profileImage : m.profileImage,

@@ -19,9 +19,10 @@ export const dbStore = {
   users: {
     find: async () => {
       if (isDbConnected()) {
-        const users = await User.find().select('username email role avatar profileImage accessCodeEnabled createdAt updatedAt').lean();
+        const users = await User.find().select('name username email role avatar profileImage accessCodeEnabled createdAt updatedAt').lean();
         return users.map(u => ({
           ...u,
+          name: u.name || u.username,
           role: u.role || 'Member',
           avatar: u.profileImage || u.avatar || 'profile1',
           profileImage: u.profileImage || u.avatar || 'profile1',
@@ -29,6 +30,7 @@ export const dbStore = {
       }
       return memState.users.map(({ password, accessCodeHash, sessions, ...u }) => ({
         ...u,
+        name: u.name || u.username,
         role: u.role || 'Member',
         avatar: u.profileImage || u.avatar || 'profile1',
         profileImage: u.profileImage || u.avatar || 'profile1',
@@ -53,18 +55,22 @@ export const dbStore = {
       return match ? { ...match, toObject: () => ({ ...match }) } : null;
     },
     createUser: async (userData) => {
+      const preparedData = {
+        ...userData,
+        name: userData.name || userData.username,
+      };
       if (isDbConnected()) {
-        const newUser = new User(userData);
+        const newUser = new User(preparedData);
         await newUser.save();
         return newUser.toObject();
       }
       const nowIso = new Date().toISOString();
       const memUser = {
-        ...userData,
+        ...preparedData,
         _id: `user-${Date.now()}`,
-        role: userData.role || 'Member',
-        avatar: userData.avatar || 'profile1',
-        profileImage: userData.profileImage || 'profile1',
+        role: preparedData.role || 'Member',
+        avatar: preparedData.avatar || 'profile1',
+        profileImage: preparedData.profileImage || 'profile1',
         accessCodeEnabled: false,
         accessCodeHash: null,
         failedAccessCodeAttempts: 0,
@@ -84,8 +90,9 @@ export const dbStore = {
       const match = memState.users.find(u => u.sessions?.some(s => s.sessionId === sessionId));
       return match ? { ...match, toObject: () => ({ ...match }) } : null;
     },
-    updateProfile: async (currentUsername, { newUsername, profileImage, avatar }) => {
+    updateProfile: async (currentUsername, { name, newUsername, profileImage, avatar }) => {
       const updates = {};
+      if (name !== undefined) updates.name = String(name).trim();
       if (newUsername) updates.username = newUsername;
       const img = profileImage !== undefined ? profileImage : avatar;
       if (img !== undefined) {
@@ -106,6 +113,7 @@ export const dbStore = {
 
       const memUser = memState.users.find(u => u.username.toLowerCase() === currentUsername.toLowerCase());
       if (memUser) {
+        if (name !== undefined) memUser.name = String(name).trim();
         if (newUsername) memUser.username = newUsername;
         if (img !== undefined) {
           memUser.profileImage = img;
@@ -114,7 +122,7 @@ export const dbStore = {
         memUser.updatedAt = updates.updatedAt;
       }
 
-      return memUser || { username: newUsername || currentUsername, profileImage: img || 'profile1', avatar: img || 'profile1' };
+      return memUser || { name: name || currentUsername, username: newUsername || currentUsername, profileImage: img || 'profile1', avatar: img || 'profile1' };
     },
     updatePassword: async (username, newHash) => {
       if (isDbConnected()) {

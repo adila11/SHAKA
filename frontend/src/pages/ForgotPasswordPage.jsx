@@ -118,7 +118,7 @@ export default function ForgotPasswordPage() {
       return;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
       setErrorMessage('Please enter a valid email address.');
       return;
@@ -298,7 +298,7 @@ export default function ForgotPasswordPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@shaka.local"
+                  placeholder="Enter the email"
                   autoComplete="email"
                   className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-[#c9b27c] transition-colors font-mono ${
                     isDark

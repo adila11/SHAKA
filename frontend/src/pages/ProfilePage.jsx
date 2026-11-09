@@ -23,6 +23,7 @@ import {
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import ProfilePictureModal from '../components/modals/ProfilePictureModal';
+import EditUserModal from '../components/modals/EditUserModal';
 import { getProfileImageUrl } from '../data/financeData';
 
 export default function ProfilePage() {
@@ -58,10 +59,9 @@ export default function ProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null); // { type: 'success' | 'error', message: '' }
 
-  // Profile Picture & Username Edit states
+  // Profile Picture & User Modal states
   const [isPictureModalOpen, setIsPictureModalOpen] = useState(false);
-  const [isEditingUsername, setIsEditingUsername] = useState(false);
-  const [editUsernameValue, setEditUsernameValue] = useState(currentUser?.username || '');
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileFeedback, setProfileFeedback] = useState(null);
 
@@ -80,30 +80,19 @@ export default function ProfilePage() {
     }
   };
 
-  const handleSaveUsername = async (e) => {
-    e?.preventDefault();
-    const trimmed = editUsernameValue.trim().toLowerCase();
-    if (!trimmed || trimmed.length < 3) {
-      setProfileFeedback({ type: 'error', message: 'Username must be at least 3 characters long.' });
-      return;
-    }
-
-    if (trimmed === currentUser?.username?.toLowerCase()) {
-      setIsEditingUsername(false);
-      return;
-    }
-
+  const handleSaveUserProfile = async ({ name: newName, username: newUsername }) => {
     setIsSavingProfile(true);
     setProfileFeedback(null);
-    const res = await updateProfile({ username: trimmed });
+    const res = await updateProfile({ name: newName, username: newUsername });
     setIsSavingProfile(false);
 
     if (res.success) {
-      setProfileFeedback({ type: 'success', message: 'Username updated successfully!' });
-      setIsEditingUsername(false);
+      setProfileFeedback({ type: 'success', message: 'User profile updated successfully!' });
       setTimeout(() => setProfileFeedback(null), 3000);
+      return { success: true };
     } else {
-      setProfileFeedback({ type: 'error', message: res.message || 'Failed to update username.' });
+      setProfileFeedback({ type: 'error', message: res.message || 'Failed to update user profile.' });
+      return { success: false, message: res.message };
     }
   };
 
@@ -329,75 +318,31 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {/* Editable Username */}
-            {isEditingUsername ? (
-              <form onSubmit={handleSaveUsername} className="space-y-3 pt-1 border-t border-[#26262b]/60">
-                <div className="text-left">
-                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                    Edit Username
-                  </label>
-                  <input
-                    type="text"
-                    value={editUsernameValue}
-                    onChange={(e) => setEditUsernameValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
-                    maxLength={24}
-                    required
-                    placeholder="Enter new username"
-                    autoFocus
-                    className={`w-full h-10 px-3 rounded-xl border text-sm font-mono outline-none focus:border-[#c9b27c] ${
-                      isDark ? 'bg-[#0e0e10] border-[#26262b] text-[#e8e8ea]' : 'bg-[#f6f5f2] border-[#e5e3dc] text-[#18181b]'
-                    }`}
-                  />
-                  <span className={`block text-[10px] mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                    Lowercase letters, numbers, and underscores only.
-                  </span>
-                </div>
-
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsEditingUsername(false);
-                      setEditUsernameValue(currentUser?.username || '');
-                      setProfileFeedback(null);
-                    }}
-                    className="flex-1 py-2 rounded-xl border border-[#26262b] text-xs font-semibold cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSavingProfile || !editUsernameValue.trim()}
-                    className="flex-1 py-2 rounded-xl bg-[#c9b27c] text-neutral-950 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {isSavingProfile ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <span>Save</span>}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div className="pt-2 border-t border-[#26262b]/60">
+            {/* User Name & Username Display */}
+            <div className="pt-2 border-t border-[#26262b]/60">
+              <div className="flex flex-col items-center justify-center">
                 <div className="flex items-center justify-center gap-2">
-                  <h3 className={`text-lg font-bold tracking-tight font-mono ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-                    {currentUser?.username || 'User'}
+                  <h3 className={`text-xl font-bold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
+                    {currentUser?.name || currentUser?.username || 'User'}
                   </h3>
                   <button
                     type="button"
                     onClick={() => {
-                      setIsEditingUsername(true);
-                      setEditUsernameValue(currentUser?.username || '');
+                      setIsUserModalOpen(true);
                       setProfileFeedback(null);
                     }}
-                    title="Edit username"
+                    title="Edit user profile"
                     className="p-1.5 rounded-lg text-[#8a8a93] hover:text-[#c9b27c] hover:bg-[#c9b27c]/10 transition-colors cursor-pointer"
                   >
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 </div>
-                <p className={`text-xs mt-1 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-                  Multi-User Ledger Admin
-                </p>
+                {/* Username shown light and small below name */}
+                <span className={`text-xs font-mono tracking-tight mt-0.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                  @{currentUser?.username || 'username'}
+                </span>
               </div>
-            )}
+            </div>
           </div>
         </div>
 
@@ -1187,6 +1132,13 @@ export default function ProfilePage() {
         onClose={() => setIsPictureModalOpen(false)}
         currentImage={currentUser?.profileImage || currentUser?.avatar}
         onSave={handleSaveProfilePicture}
+      />
+      {/* Edit User Profile Modal */}
+      <EditUserModal
+        isOpen={isUserModalOpen}
+        onClose={() => setIsUserModalOpen(false)}
+        currentUser={currentUser}
+        onSave={handleSaveUserProfile}
       />
     </div>
   );

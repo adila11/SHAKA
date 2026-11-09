@@ -114,8 +114,9 @@ export const login = async (req, res, next) => {
       sessionExpiresAt: expiresAt,
       accessCodeEnabled: Boolean(user.accessCodeEnabled),
       user: {
+        name: user.name || user.username,
         username: user.username,
-        email: user.email || `${user.username}@shaka.local`,
+        email: user.email || `${user.username}@shaka`,
         role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
@@ -132,7 +133,7 @@ export const login = async (req, res, next) => {
 // 1b. Signup / Registration
 export const signup = async (req, res, next) => {
   try {
-    const { username, email, password } = req.body;
+    const { name, username, email, password } = req.body;
 
     if (!username || !password) {
       return res.status(400).json({
@@ -157,7 +158,7 @@ export const signup = async (req, res, next) => {
     }
 
     const trimmedEmail = email ? String(email).trim().toLowerCase() : '';
-    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+$/.test(trimmedEmail)) {
       return res.status(400).json({
         success: false,
         message: 'Please provide a valid email address format',
@@ -197,9 +198,12 @@ export const signup = async (req, res, next) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const trimmedName = name ? String(name).trim() : trimmedUser;
+
     const newUser = await dbStore.users.createUser({
+      name: trimmedName,
       username: trimmedUser,
-      email: trimmedEmail || `${trimmedUser}@shaka.local`,
+      email: trimmedEmail || `${trimmedUser}@shaka`,
       password: hashedPassword,
       role: 'Member',
       avatar: 'profile1',
@@ -266,6 +270,7 @@ export const signup = async (req, res, next) => {
       sessionExpiresAt: expiresAt,
       accessCodeEnabled: false,
       user: {
+        name: newUser.name || newUser.username,
         username: newUser.username,
         email: newUser.email,
         role: newUser.role || 'Member',
@@ -834,8 +839,9 @@ export const getMe = async (req, res, next) => {
     res.status(200).json({
       success: true,
       user: {
+        name: user.name || user.username,
         username: user.username,
-        email: user.email || `${user.username}@shaka.local`,
+        email: user.email || `${user.username}@shaka`,
         role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
@@ -941,15 +947,15 @@ export const changePassword = async (req, res, next) => {
   }
 };
 
-// 11. Update Profile (Username & Profile Picture)
+// 11. Update Profile (Name, Username & Profile Picture)
 export const updateProfile = async (req, res, next) => {
   try {
-    const { username: newUsername, profileImage, avatar } = req.body;
+    const { name, username: newUsername, profileImage, avatar } = req.body;
     const currentUsername = req.user.username;
 
     const selectedImage = profileImage !== undefined ? profileImage : avatar;
 
-    if (!newUsername && selectedImage === undefined) {
+    if (name === undefined && !newUsername && selectedImage === undefined) {
       return res.status(400).json({
         success: false,
         message: 'No profile updates provided',
@@ -967,7 +973,7 @@ export const updateProfile = async (req, res, next) => {
     }
 
     const trimmedUsername = newUsername ? String(newUsername).trim() : currentUsername;
-    if (trimmedUsername.length < 3) {
+    if (newUsername && trimmedUsername.length < 3) {
       return res.status(400).json({
         success: false,
         message: 'Username must be at least 3 characters long',
@@ -986,8 +992,11 @@ export const updateProfile = async (req, res, next) => {
       }
     }
 
+    const trimmedName = name !== undefined ? String(name).trim() : undefined;
+
     const updatedUser = await dbStore.users.updateProfile(currentUsername, {
-      newUsername: trimmedUsername,
+      name: trimmedName,
+      newUsername: newUsername ? trimmedUsername : undefined,
       profileImage: selectedImage,
       avatar: selectedImage,
     });
@@ -1012,6 +1021,7 @@ export const updateProfile = async (req, res, next) => {
       message: 'Profile updated successfully',
       token,
       user: {
+        name: updatedUser.name || updatedUser.username,
         username: updatedUser.username,
         profileImage: updatedUser.profileImage || updatedUser.avatar || 'profile1',
         avatar: updatedUser.profileImage || updatedUser.avatar || 'profile1',

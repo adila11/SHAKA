@@ -74,7 +74,7 @@ export default function Screen2ForgotPassword({ customTheme = null, onNavigate }
                   ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
                   : 'bg-white border-[#e5e3dc] text-[#18181b]'
               }`}
-              placeholder="admin@shaka.local"
+              placeholder="Enter the email"
             />
             <div className="absolute right-3.5 top-3.5 text-[#8a8a93]">
               <Mail className="w-4 h-4" />

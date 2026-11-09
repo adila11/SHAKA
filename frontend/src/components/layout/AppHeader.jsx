@@ -65,15 +65,22 @@ export default function AppHeader({ title = 'SHAKA', customTheme = null, onProfi
         <button
           type="button"
           onClick={handleAvatarClick}
-          className="flex items-center gap-2 cursor-pointer group"
+          className="flex items-center gap-2.5 cursor-pointer group"
         >
-          <span
-            className={`text-xs font-medium transition-colors ${
-              isDark ? 'text-[#8a8a93] group-hover:text-[#e8e8ea]' : 'text-[#71717a] group-hover:text-[#18181b]'
-            }`}
-          >
-            {currentUser?.username || 'Member'}
-          </span>
+          <div className="flex flex-col text-right leading-tight">
+            <span
+              className={`text-xs font-semibold transition-colors ${
+                isDark ? 'text-[#e8e8ea] group-hover:text-[#c9b27c]' : 'text-[#18181b] group-hover:text-[#c9b27c]'
+              }`}
+            >
+              {currentUser?.name || currentUser?.username || 'Member'}
+            </span>
+            {currentUser?.username && (
+              <span className={`text-[10px] font-mono ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
+                @{currentUser.username}
+              </span>
+            )}
+          </div>
           <div
             className={`w-7 h-7 rounded-full border text-[10px] font-bold flex items-center justify-center transition-colors shadow-sm overflow-hidden ${
               isDark

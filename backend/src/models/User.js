@@ -36,6 +36,11 @@ const sessionSchema = new mongoose.Schema(
 
 const userSchema = new mongoose.Schema(
   {
+    name: {
+      type: String,
+      trim: true,
+      default: '',
+    },
     username: {
       type: String,
       required: true,

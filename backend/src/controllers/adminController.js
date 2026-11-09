@@ -40,7 +40,7 @@ export const createPasswordResetRequest = async (req, res, next) => {
     }
 
     const trimmedEmail = String(email).trim().toLowerCase();
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+$/;
     if (!emailRegex.test(trimmedEmail)) {
       return res.status(400).json({
         success: false,
@@ -56,8 +56,19 @@ export const createPasswordResetRequest = async (req, res, next) => {
       });
     }
 
-    // Lookup user by registered email
-    const user = await dbStore.users.findByEmail(trimmedEmail);
+    // Lookup user by registered email (with fallback for @shaka, @shaka.local, or username)
+    let user = await dbStore.users.findByEmail(trimmedEmail);
+    if (!user) {
+      if (trimmedEmail.endsWith('@shaka')) {
+        user = await dbStore.users.findByEmail(`${trimmedEmail}.local`);
+      } else if (trimmedEmail.endsWith('@shaka.local')) {
+        user = await dbStore.users.findByEmail(trimmedEmail.replace(/\.local$/, ''));
+      }
+      if (!user) {
+        const usernamePart = trimmedEmail.split('@')[0];
+        user = await dbStore.users.findByUsername(usernamePart);
+      }
+    }
 
     // Security check: Must exist AND must be an Admin
     if (!user || user.role !== 'Admin') {
