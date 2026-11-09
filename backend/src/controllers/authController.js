@@ -29,20 +29,8 @@ export const login = async (req, res, next) => {
       });
     }
 
-    // Check bcrypt hash
-    let isMatch = await bcrypt.compare(password, user.password).catch(() => false);
-
-    // Administrator credentials fallback
-    if (!isMatch) {
-      if (user.username.toLowerCase() === 'abdulshamil' && password === 'Abdul@3621') {
-        isMatch = true;
-      } else if (
-        user.username.toLowerCase() === 'adilaka' &&
-        (password === 'Adi;a@3621' || password === 'Adila@3621')
-      ) {
-        isMatch = true;
-      }
-    }
+    // Check bcrypt hash — no plaintext fallbacks
+    const isMatch = await bcrypt.compare(password, user.password).catch(() => false);
 
     if (!isMatch) {
       return res.status(401).json({
@@ -56,7 +44,7 @@ export const login = async (req, res, next) => {
     const now = new Date();
     const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3-day sliding session
 
-    // Generate 24-hour Access Token
+    // Generate 15-minute Access Token
     const token = jwt.sign(
       {
         id: user._id || user.username,
@@ -66,7 +54,7 @@ export const login = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: '15m', algorithm: config.jwtAlgorithm }
     );
 
     // Generate 3-day Refresh Token
@@ -79,7 +67,7 @@ export const login = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d' }
+      { expiresIn: '3d', algorithm: config.jwtAlgorithm }
     );
 
     // Store session with hashed refresh token
@@ -96,11 +84,14 @@ export const login = async (req, res, next) => {
 
     await dbStore.users.addSession(user.username, sessionData);
 
-    // Set HttpOnly refresh token cookie
+    // Cleanup old expired/revoked sessions (fire-and-forget, non-blocking)
+    dbStore.users.cleanupExpiredSessions(user.username).catch(() => {});
+
+    // Set HttpOnly refresh token cookie — this is the ONLY place the refresh token lives
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
       maxAge: 3 * 24 * 60 * 60 * 1000,
     });
@@ -109,7 +100,7 @@ export const login = async (req, res, next) => {
       success: true,
       message: 'Login successful',
       token,
-      refreshToken,
+      // refreshToken intentionally NOT returned in body — it's in the HttpOnly cookie
       sessionId,
       sessionExpiresAt: expiresAt,
       accessCodeEnabled: Boolean(user.accessCodeEnabled),
@@ -225,7 +216,7 @@ export const signup = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: '15m', algorithm: config.jwtAlgorithm }
     );
 
     const refreshToken = jwt.sign(
@@ -237,7 +228,7 @@ export const signup = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d' }
+      { expiresIn: '3d', algorithm: config.jwtAlgorithm }
     );
 
     const refreshTokenHash = hashToken(refreshToken);
@@ -256,7 +247,7 @@ export const signup = async (req, res, next) => {
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
       maxAge: 3 * 24 * 60 * 60 * 1000,
     });
@@ -265,7 +256,7 @@ export const signup = async (req, res, next) => {
       success: true,
       message: 'Account created successfully',
       token,
-      refreshToken,
+      // refreshToken intentionally NOT returned in body — it's in the HttpOnly cookie
       sessionId,
       sessionExpiresAt: expiresAt,
       accessCodeEnabled: false,
@@ -301,7 +292,7 @@ export const refresh = async (req, res, next) => {
 
     let decoded;
     try {
-      decoded = jwt.verify(rawRefresh, config.jwtRefreshSecret);
+      decoded = jwt.verify(rawRefresh, config.jwtRefreshSecret, { algorithms: ['HS256'] });
     } catch {
       return res.status(401).json({
         success: false,
@@ -347,9 +338,11 @@ export const refresh = async (req, res, next) => {
     // Verify refresh token hash
     const providedHash = hashToken(rawRefresh);
     if (session.refreshTokenHash !== providedHash) {
+      await dbStore.users.revokeSession(user.username, session.sessionId);
       return res.status(401).json({
         success: false,
-        message: 'Refresh token invalid or previously rotated.',
+        message: 'Refresh token invalid or reuse detected. Session revoked.',
+        sessionRevoked: true,
       });
     }
 
@@ -372,7 +365,7 @@ export const refresh = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: '15m', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newRefreshToken = jwt.sign(
@@ -383,7 +376,7 @@ export const refresh = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d' }
+      { expiresIn: '3d', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newHash = hashToken(newRefreshToken);
@@ -399,7 +392,8 @@ export const refresh = async (req, res, next) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+      path: '/',
       maxAge: 3 * 24 * 60 * 60 * 1000,
     });
 
@@ -526,7 +520,7 @@ export const verifyAccessCode = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: '15m', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newRefreshToken = jwt.sign(
@@ -537,7 +531,7 @@ export const verifyAccessCode = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d' }
+      { expiresIn: '3d', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newHash = hashToken(newRefreshToken);
@@ -548,7 +542,8 @@ export const verifyAccessCode = async (req, res, next) => {
     res.cookie('refreshToken', newRefreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
+      path: '/',
       maxAge: 3 * 24 * 60 * 60 * 1000,
     });
 
@@ -724,14 +719,7 @@ export const resetAccessCode = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    let isPasswordMatch = await bcrypt.compare(password, user.password).catch(() => false);
-    if (!isPasswordMatch) {
-      if (user.username.toLowerCase() === 'abdulshamil' && password === 'Abdul@3621') {
-        isPasswordMatch = true;
-      } else if (user.username.toLowerCase() === 'adilaka' && (password === 'Adi;a@3621' || password === 'Adila@3621')) {
-        isPasswordMatch = true;
-      }
-    }
+    const isPasswordMatch = await bcrypt.compare(password, user.password).catch(() => false);
 
     if (!isPasswordMatch) {
       return res.status(401).json({
@@ -801,7 +789,7 @@ export const logout = async (req, res, next) => {
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
-      sameSite: 'lax',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
     });
 
@@ -826,7 +814,8 @@ export const getMe = async (req, res, next) => {
       });
     }
 
-    const user = await dbStore.users.findByUsername(username);
+    // authMiddleware already fetched and attached req.user
+    const user = req.user || (await dbStore.users.findByUsername(username));
 
     if (!user) {
       return res.status(401).json({
@@ -906,17 +895,9 @@ export const changePassword = async (req, res, next) => {
       });
     }
 
-    // Check if user has hardcoded configured check or bcrypt hash
     let isMatch = false;
     if (user.password) {
       isMatch = await bcrypt.compare(providedOldPassword, user.password).catch(() => false);
-    }
-    if (!isMatch) {
-      if (user.username.toLowerCase() === 'abdulshamil' && providedOldPassword === 'Abdul@3621') {
-        isMatch = true;
-      } else if (user.username.toLowerCase() === 'adilaka' && (providedOldPassword === 'Adi;a@3621' || providedOldPassword === 'Adila@3621')) {
-        isMatch = true;
-      }
     }
 
     if (!isMatch) {
@@ -1012,7 +993,7 @@ export const updateProfile = async (req, res, next) => {
           type: 'access',
         },
         config.jwtSecret,
-        { expiresIn: '24h' }
+        { expiresIn: '15m', algorithm: config.jwtAlgorithm || 'HS256' }
       );
     }
 

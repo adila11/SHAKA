@@ -82,13 +82,17 @@ export const dbStore = {
       memState.users.push(memUser);
       return { ...memUser, toObject: () => ({ ...memUser }) };
     },
-    findBySessionId: async (sessionId) => {
+    findBySessionId: async (sessionId, opts = {}) => {
       if (!sessionId) return null;
       if (isDbConnected()) {
-        return User.findOne({ 'sessions.sessionId': sessionId });
+        const query = User.findOne({ 'sessions.sessionId': sessionId });
+        if (opts.lean) {
+          query.lean().select('username name email role avatar profileImage accessCodeEnabled accessCodeHash sessions');
+        }
+        return query;
       }
       const match = memState.users.find(u => u.sessions?.some(s => s.sessionId === sessionId));
-      return match ? { ...match, toObject: () => ({ ...match }) } : null;
+      return match ? { ...match } : null;
     },
     updateProfile: async (currentUsername, { name, newUsername, profileImage, avatar }) => {
       const updates = {};
@@ -217,6 +221,28 @@ export const dbStore = {
         user.sessions.forEach(s => {
           s.revoked = true;
         });
+      }
+    },
+    cleanupExpiredSessions: async (username) => {
+      const now = new Date();
+      if (isDbConnected()) {
+        await User.updateOne(
+          { username },
+          {
+            $pull: {
+              sessions: {
+                $or: [
+                  { expiresAt: { $lt: now } },
+                  { revoked: true },
+                ],
+              },
+            },
+          }
+        ).catch(() => {});
+      }
+      const user = memState.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+      if (user && user.sessions) {
+        user.sessions = user.sessions.filter(s => !s.revoked && new Date(s.expiresAt) > now);
       }
     },
     updateAccessCode: async (username, { accessCodeEnabled, accessCodeHash }) => {

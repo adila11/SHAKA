@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 
 import authRoutes from './routes/authRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
@@ -13,12 +16,26 @@ import { isDbConnected } from './data/dbStore.js';
 
 const app = express();
 
-// Comprehensive CORS setup
+// Security headers
+app.use(helmet());
+
+// CORS — restrict to known origins
+const allowedOrigins = [
+  process.env.CLIENT_ORIGIN || 'http://localhost:5173',
+  'https://shaka-finance.vercel.app',
+  'http://localhost:5173',
+  'http://localhost:4173',
+];
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g. mobile apps, curl, server-to-server) or any dev origin
-      callback(null, true);
+      // Allow requests with no origin (mobile apps, server-to-server, curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+        return callback(null, true);
+      }
+      callback(new Error(`CORS: Origin ${origin} not allowed`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -29,12 +46,41 @@ app.use(
 
 app.options('*', cors());
 
+// Cookie parser (needed for HttpOnly refresh token cookie)
+app.use(cookieParser());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('dev'));
 }
+
+// Rate limiting for auth endpoints (strict)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many requests from this IP. Please try again after 15 minutes.',
+  },
+  skip: (req) => process.env.NODE_ENV === 'development',
+});
+
+// Even stricter limiter for login/refresh specifically
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    message: 'Too many login attempts. Please wait 15 minutes before trying again.',
+  },
+  skip: (req) => process.env.NODE_ENV === 'development',
+});
 
 // Health check endpoint with genuine database connectivity reporting
 app.get('/api/health', (req, res) => {
@@ -49,6 +95,14 @@ app.get('/api/health', (req, res) => {
     cors: 'enabled',
   });
 });
+
+// Apply rate limiters before auth routes
+app.use('/api/auth/login', loginLimiter);
+app.use('/api/auth/refresh', loginLimiter);
+app.use('/api/auth/signup', authLimiter);
+app.use('/api/auth/verify-access-code', authLimiter);
+app.use('/api/auth/access-code', authLimiter);
+app.use('/api/admin/forgot-password', authLimiter);
 
 // API Routes
 app.use('/api/auth', authRoutes);

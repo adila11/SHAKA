@@ -68,6 +68,7 @@ export async function request(endpoint, options = {}, isRetry = false) {
   delete fetchOptions.signal;
   const config = {
     ...fetchOptions,
+    credentials: 'include',
     headers,
     signal: controller.signal,
   };
@@ -104,7 +105,7 @@ export async function request(endpoint, options = {}, isRetry = false) {
         const storedRefresh = localStorage.getItem('shaka_refresh_token');
         const storedSessionId = localStorage.getItem('shaka_session_id');
 
-        if (storedRefresh && storedSessionId) {
+        if (storedSessionId) {
           // If another request is already refreshing, join the single-flight queue
           if (isRefreshing) {
             return new Promise((resolve, reject) => {
@@ -131,8 +132,12 @@ export async function request(endpoint, options = {}, isRetry = false) {
           try {
             const refreshRes = await fetch(`${currentBaseUrl}/auth/refresh`, {
               method: 'POST',
+              credentials: 'include',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken: storedRefresh, sessionId: storedSessionId }),
+              body: JSON.stringify({
+                ...(storedRefresh ? { refreshToken: storedRefresh } : {}),
+                sessionId: storedSessionId,
+              }),
             });
             const refreshData = await refreshRes.json().catch(() => ({}));
 
@@ -164,6 +169,13 @@ export async function request(endpoint, options = {}, isRetry = false) {
                 onRequiresAccessCodeCallback(storedSessionId);
               }
               throw accessErr;
+            } else if (refreshRes.status >= 500) {
+              // 5xx server error: temporary backend glitch or reboot, DO NOT wipe session
+              isRefreshing = false;
+              const serverErr = new Error(refreshData.message || 'Authentication server unavailable. Retrying later.');
+              serverErr.isServerError = true;
+              onRefreshed(serverErr, null);
+              throw serverErr;
             } else {
               isRefreshing = false;
               const expireErr = new Error(refreshData.message || 'Session expired. Please log in again.');

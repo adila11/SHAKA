@@ -285,6 +285,7 @@ export function FinanceProvider({ children }) {
       setHouseholdMembers([]);
       setHouseholdBalances(null);
       setSessionInfo(null);
+      setIsLoading(false);
       return;
     }
 
@@ -295,76 +296,34 @@ export function FinanceProvider({ children }) {
         setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
         setAuthStatus('AUTHENTICATED');
         setIsBackendConnected(true);
-        await refreshData({ showLoading: false });
-        await fetchSessionInfo();
+        // Load data in background without blocking screen transition
+        refreshData({ showLoading: false, full: true });
+        fetchSessionInfo();
       } else {
-        localStorage.removeItem('shaka_token');
-        localStorage.removeItem('shaka_refresh_token');
-        localStorage.removeItem('shaka_session_id');
-        localStorage.removeItem('shaka_session_expires_at');
+        clearLocalAuthData();
         setCurrentUser(null);
         setAuthStatus('UNAUTHENTICATED');
       }
     } catch (err) {
       if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
-        localStorage.removeItem('shaka_token');
-        localStorage.removeItem('shaka_refresh_token');
-        localStorage.removeItem('shaka_session_id');
-        localStorage.removeItem('shaka_session_expires_at');
+        clearLocalAuthData();
         setCurrentUser(null);
         setAuthStatus('UNAUTHENTICATED');
       } else {
-        // Backend server is unreachable or stopped
+        // Backend server is unreachable or offline
         setIsBackendConnected(false);
         setAuthStatus('SERVER_UNAVAILABLE');
         setError(err.message || 'Cannot connect to SHAKA secure backend server.');
       }
+    } finally {
+      setIsLoading(false);
     }
-  }, [refreshData, fetchSessionInfo]);
+  }, [refreshData, fetchSessionInfo, clearLocalAuthData]);
 
-  // Initial session verification on mount
+  // Initial session verification on mount (deduplicated: delegates strictly to initializeAuth)
   useEffect(() => {
-    let isSubscribed = true;
-    const hasCredentials = typeof localStorage !== 'undefined' && Boolean(localStorage.getItem('shaka_token') || localStorage.getItem('shaka_session_id'));
-    if (!hasCredentials) return;
-
-    api.auth.getMe().then(res => {
-      if (!isSubscribed) return;
-      if (res && res.success && res.user) {
-        setCurrentUser(res.user);
-        setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
-        setAuthStatus('AUTHENTICATED');
-        setIsBackendConnected(true);
-        refreshData({ showLoading: false, full: true });
-        fetchSessionInfo();
-      } else {
-        localStorage.removeItem('shaka_token');
-        localStorage.removeItem('shaka_refresh_token');
-        localStorage.removeItem('shaka_session_id');
-        localStorage.removeItem('shaka_session_expires_at');
-        setCurrentUser(null);
-        setAuthStatus('UNAUTHENTICATED');
-      }
-    }).catch(err => {
-      if (!isSubscribed) return;
-      if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
-        localStorage.removeItem('shaka_token');
-        localStorage.removeItem('shaka_refresh_token');
-        localStorage.removeItem('shaka_session_id');
-        localStorage.removeItem('shaka_session_expires_at');
-        setCurrentUser(null);
-        setAuthStatus('UNAUTHENTICATED');
-      } else {
-        setIsBackendConnected(false);
-        setAuthStatus('SERVER_UNAVAILABLE');
-        setError(err.message || 'Cannot connect to SHAKA secure backend server.');
-      }
-    });
-
-    return () => {
-      isSubscribed = false;
-    };
-  }, [refreshData, fetchSessionInfo]);
+    initializeAuth();
+  }, [initializeAuth]);
 
   // Health check worker: unauthenticated health check that does NOT slide user session
   const checkHealth = useCallback(async () => {
@@ -409,13 +368,13 @@ export function FinanceProvider({ children }) {
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
-    // Active ledger synchronization polling every 25 seconds when tab is visible
+    // Active ledger synchronization polling every 45 seconds when tab is visible
     const pollInterval = isLoggedIn
       ? setInterval(() => {
           if (document.visibilityState === 'visible') {
             refreshData({ showLoading: false, full: false });
           }
-        }, 25000)
+        }, 45000)
       : null;
 
     const healthInterval = setInterval(checkHealth, 30000);

@@ -19,13 +19,13 @@ export const protect = async (req, res, next) => {
 
   let decoded;
   try {
-    decoded = jwt.verify(token, config.jwtSecret);
+    decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      // Decode without verification to inspect sessionId
+      // Decode without verification to inspect sessionId — one DB read to check session validity
       const unverified = jwt.decode(token);
       if (unverified && unverified.sessionId) {
-        const user = await dbStore.users.findBySessionId(unverified.sessionId);
+        const user = await dbStore.users.findBySessionId(unverified.sessionId, { lean: true });
         const session = user?.sessions?.find(s => s.sessionId === unverified.sessionId);
         if (session && !session.revoked && new Date(session.expiresAt) > new Date()) {
           return res.status(401).json({
@@ -51,16 +51,18 @@ export const protect = async (req, res, next) => {
   }
 
   try {
-    const user = await dbStore.users.findByUsername(decoded.username);
+    // Single DB read: look up by sessionId (indexed) instead of username
+    const user = await dbStore.users.findBySessionId(decoded.sessionId, { lean: true });
     if (!user) {
       return res.status(401).json({
         success: false,
-        message: 'Not authorized, user not found',
+        message: 'Not authorized, session not found',
+        sessionRevoked: true,
       });
     }
 
     // Validate session
-    let session = user.sessions?.find(s => s.sessionId === decoded.sessionId);
+    const session = user.sessions?.find(s => s.sessionId === decoded.sessionId);
 
     // If session not found or revoked
     if (!session || session.revoked) {
@@ -74,7 +76,8 @@ export const protect = async (req, res, next) => {
     // Validate 3-day inactivity expiration
     const now = new Date();
     if (new Date(session.expiresAt) <= now) {
-      await dbStore.users.revokeSession(user.username, decoded.sessionId);
+      // Fire and forget revocation — don't block the response
+      dbStore.users.revokeSession(user.username, decoded.sessionId).catch(() => {});
       return res.status(401).json({
         success: false,
         message: 'Session expired. Please log in again.',
@@ -82,16 +85,16 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Sliding Session Expiration: Valid authenticated activity resets the 3-day countdown
-    const { expiresAt, lastActivityAt } = await dbStore.users.touchSessionActivity(
-      user.username,
-      decoded.sessionId
-    );
-    session.lastActivityAt = lastActivityAt;
-    session.expiresAt = expiresAt;
+    // Sliding Session Expiration: fire-and-forget (non-blocking)
+    // Don't await — the response is not blocked by the session touch
+    const touchPromise = dbStore.users.touchSessionActivity(user.username, decoded.sessionId);
+    touchPromise.then(({ expiresAt, lastActivityAt }) => {
+      session.lastActivityAt = lastActivityAt;
+      session.expiresAt = expiresAt;
+    }).catch(() => {}); // Silently ignore touch failures
 
     // Attach safe user and session to request
-    const safeUser = user.toObject ? user.toObject() : { ...user };
+    const safeUser = { ...user };
     delete safeUser.password;
     delete safeUser.accessCodeHash;
 
@@ -113,4 +116,3 @@ export const requireAdmin = (req, res, next) => {
   }
   next();
 };
-
