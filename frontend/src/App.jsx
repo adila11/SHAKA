@@ -24,6 +24,7 @@ const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage'));
 const ChangePasswordPage = lazy(() => import('./pages/ChangePasswordPage'));
 const LogExpensePage = lazy(() => import('./pages/LogExpensePage'));
 const AllScreensGallery = lazy(() => import('./components/showcase/AllScreensGallery'));
+const NotFoundPage = lazy(() => import('./pages/NotFoundPage'));
 
 function PageLoadingFallback() {
   return (
@@ -206,14 +207,7 @@ function PageRouter() {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/change-pass" element={<ChangePasswordPage />} />
           <Route path="/change-password" element={<ChangePasswordPage />} />
-          <Route
-            path="*"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
       <AccessCodePromptModal />

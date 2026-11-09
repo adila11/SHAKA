@@ -6,10 +6,13 @@ import React, {
 } from 'react';
 import {
   RouterContext,
+  ParamsContext,
   LOCATION_CHANGE_EVENT,
-  normalizePath,
+  normalizePathname,
+  splitPath,
   pathToScreen,
   screenToPath,
+  matchPath,
   useLocation,
   useNavigate,
 } from './routerUtils';
@@ -20,17 +23,18 @@ import {
 export function BrowserRouter({ children }) {
   const [location, setLocation] = useState(() => {
     if (typeof window === 'undefined') {
-      return { pathname: '/', search: '', hash: '' };
+      return { pathname: '/', search: '', hash: '', state: null };
     }
 
     // Hash-to-Browser Path auto-migration (e.g., /#profile -> /profile)
-    if (window.location.hash && window.location.hash.length > 1) {
+    if (window.location.hash && window.location.hash.length > 1 && !window.location.hash.startsWith('#/')) {
       const hashPath = window.location.hash.replace(/^#\/?/, '/');
       window.history.replaceState(null, '', hashPath);
       return {
         pathname: hashPath,
-        search: window.location.search,
+        search: window.location.search || '',
         hash: '',
+        state: null,
       };
     }
 
@@ -38,6 +42,7 @@ export function BrowserRouter({ children }) {
       pathname: window.location.pathname || '/',
       search: window.location.search || '',
       hash: window.location.hash || '',
+      state: window.history.state || null,
     };
   });
 
@@ -48,6 +53,7 @@ export function BrowserRouter({ children }) {
         pathname: window.location.pathname || '/',
         search: window.location.search || '',
         hash: window.location.hash || '',
+        state: window.history.state || null,
       });
     };
 
@@ -63,13 +69,13 @@ export function BrowserRouter({ children }) {
   const navigate = useCallback((to, options = {}) => {
     if (typeof window === 'undefined') return;
 
-    const targetPath = screenToPath(to);
+    const targetUrl = screenToPath(to);
     const isReplace = Boolean(options.replace);
 
     if (isReplace) {
-      window.history.replaceState(options.state || null, '', targetPath);
+      window.history.replaceState(options.state || null, '', targetUrl);
     } else {
-      window.history.pushState(options.state || null, '', targetPath);
+      window.history.pushState(options.state || null, '', targetUrl);
     }
   }, []);
 
@@ -96,43 +102,62 @@ export function Route(props) {
 }
 
 /**
- * Declarative Routes matcher: matches current pathname against child Route paths
+ * Declarative Routes matcher: matches current pathname against child Route patterns
  */
 export function Routes({ children }) {
   const location = useLocation();
-  const currentPath = normalizePath(location.pathname);
+  const currentPath = normalizePathname(location.pathname);
   const currentScreen = pathToScreen(location.pathname);
 
   const routes = React.Children.toArray(children).filter(
     child => React.isValidElement(child) && child.props.path !== undefined
   );
 
-  // 1. Direct path match
+  let wildcardRoute = null;
+
+  // 1. Direct or dynamic pattern matching
   for (const route of routes) {
-    const routePath = normalizePath(route.props.path);
-    if (routePath === currentPath) {
-      return route.props.element;
+    const routePattern = route.props.path;
+    if (routePattern === '*' || routePattern === '/*') {
+      wildcardRoute = route;
+      continue;
+    }
+
+    const match = matchPath(routePattern, currentPath);
+    if (match) {
+      return (
+        <ParamsContext.Provider value={match.params}>
+          {route.props.element}
+        </ParamsContext.Provider>
+      );
     }
   }
 
-  // 2. Screen ID match (handles root '/' matching '/dashboard', '/log-expense' matching '/add-expense', etc.)
+  // 2. Canonical screen ID match for route aliases (e.g. /log-expense -> /add-expense)
   for (const route of routes) {
-    const routeScreen = pathToScreen(route.props.path);
-    if (routeScreen === currentScreen) {
-      return route.props.element;
+    const routePattern = route.props.path;
+    if (routePattern === '*' || routePattern === '/*') continue;
+
+    const routeScreen = pathToScreen(routePattern);
+    if (routeScreen && routeScreen === currentScreen && routeScreen !== currentPath.replace(/^\//, '')) {
+      return (
+        <ParamsContext.Provider value={{}}>
+          {route.props.element}
+        </ParamsContext.Provider>
+      );
     }
   }
 
-  // 3. Fallback wildcards or aliases
-  for (const route of routes) {
-    const routePath = route.props.path;
-    if (routePath === '*' || routePath === '/*') {
-      return route.props.element;
-    }
+  // 3. Render wildcard route (Custom 404 handler)
+  if (wildcardRoute) {
+    return (
+      <ParamsContext.Provider value={{ '*': currentPath.replace(/^\//, '') }}>
+        {wildcardRoute.props.element}
+      </ParamsContext.Provider>
+    );
   }
 
-  // 4. Default to first route or null
-  return routes[0]?.props.element || null;
+  return null;
 }
 
 /**
@@ -179,8 +204,9 @@ export function NavLink({
 }) {
   const location = useLocation();
   const targetPath = screenToPath(to);
-  const currentPath = normalizePath(location.pathname);
-  const isActive = currentPath === targetPath || pathToScreen(currentPath) === pathToScreen(targetPath);
+  const currentPath = normalizePathname(location.pathname);
+  const targetPathname = splitPath(targetPath).pathname;
+  const isActive = currentPath === targetPathname || pathToScreen(currentPath) === pathToScreen(targetPathname);
 
   const resolvedClass =
     typeof className === 'function'

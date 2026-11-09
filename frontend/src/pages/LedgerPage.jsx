@@ -5,14 +5,32 @@ import { Skeleton } from '../components/common/Skeleton';
 import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
+import { useSearchParams } from '../router/routerUtils';
 
 export default function LedgerPage() {
   const { transactions, totalSpent, setCurrentScreen, availableCategories, isLoading, shortMonth, currentYear } = useFinance();
   const { isDark } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [selectedMonth, setSelectedMonth] = useState(() => `${shortMonth || 'Nov'} ${currentYear || 2026}`);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Derived state directly from URL query parameters (single source of truth)
+  const searchQuery = searchParams.get('search') || '';
+  const selectedCategory = searchParams.get('category') || 'All';
+
+  const handleSearchChange = (val) => {
+    const nextParams = {};
+    if (val) nextParams.search = val;
+    if (selectedCategory && selectedCategory !== 'All') nextParams.category = selectedCategory;
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleCategorySelect = (catName) => {
+    const nextParams = {};
+    if (searchQuery.trim()) nextParams.search = searchQuery.trim();
+    if (catName && catName !== 'All') nextParams.category = catName;
+    setSearchParams(nextParams, { replace: true });
+  };
 
   const filteredTransactions = transactions.filter((tx) => {
     const matchesSearch =
@@ -100,7 +118,7 @@ export default function LedgerPage() {
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search description, member, or category..."
               className={`w-full h-10 pl-9 pr-4 rounded-xl border text-xs outline-none focus:border-[#c9b27c] transition-colors ${
                 isDark
@@ -118,7 +136,7 @@ export default function LedgerPage() {
             </span>
             <button
               type="button"
-              onClick={() => setSelectedCategory('All')}
+              onClick={() => handleCategorySelect('All')}
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap ${
                 selectedCategory === 'All'
                   ? 'bg-[#c9b27c] text-neutral-950 border-[#c9b27c]'
@@ -133,7 +151,7 @@ export default function LedgerPage() {
               <button
                 key={cat.name}
                 type="button"
-                onClick={() => setSelectedCategory(cat.name)}
+                onClick={() => handleCategorySelect(cat.name)}
                 className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
                   selectedCategory === cat.name
                     ? 'bg-[#c9b27c]/20 border-[#c9b27c] text-[#c9b27c]'
