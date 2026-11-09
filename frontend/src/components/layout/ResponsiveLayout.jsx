@@ -9,9 +9,8 @@ export default function ResponsiveLayout({ children }) {
 
   return (
     <div
-      className={`min-h-screen flex flex-col font-sans transition-colors ${
-        isDark ? 'bg-[#0e0e10] text-[#e8e8ea]' : 'bg-[#f6f5f2] text-[#18181b]'
-      }`}
+      className={`min-h-screen flex flex-col font-sans transition-colors ${isDark ? 'bg-[#0e0e10] text-[#e8e8ea]' : 'bg-[#f6f5f2] text-[#18181b]'
+        }`}
     >
       {/* Top Navbar */}
       <Navbar />
@@ -29,14 +28,10 @@ export default function ResponsiveLayout({ children }) {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-[#c9b27c]" />
-            <span>SHAKA • Quiet Luxury Personal Finance & Ledger</span>
+            <span>SHAKA • Structure Your Spend. Elevate Your Wealth.</span>
           </div>
-          <div className="flex items-center gap-4">
-            <span>Responsive Web & Mobile Architecture</span>
-            <span>•</span>
-            <span>Google Stitch Integration</span>
-            <span>•</span>
-            <span className="font-mono text-[#c9b27c]">v1.0.0</span>
+          <div>
+            <span>Created By Shaka 2026</span>
           </div>
         </div>
       </footer>

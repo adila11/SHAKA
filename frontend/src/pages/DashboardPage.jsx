@@ -1,4 +1,4 @@
-import { ArrowRight, Plus, Calendar, ShieldCheck, ShieldAlert, UserCheck } from 'lucide-react';
+import { ArrowRight, Plus, Calendar, ShieldAlert, UserCheck } from 'lucide-react';
 import MonthlyLimitWidget from '../components/widgets/MonthlyLimitWidget';
 import DonutSpendWidget from '../components/widgets/DonutSpendWidget';
 import StatCardsWidget from '../components/widgets/StatCardsWidget';
@@ -20,7 +20,6 @@ export default function DashboardPage() {
     daysPassed,
     monthName,
     currentYear,
-    householdMembers,
     setCurrentScreen,
     isLoading,
     pendingAdminRequests,
@@ -130,8 +129,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {/* Top 4 Metric Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 min-w-0 max-w-full">
+      {/* Top 3 Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 min-w-0 max-w-full">
         {/* Metric 1 */}
         <div
           className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
@@ -196,24 +195,6 @@ export default function DashboardPage() {
           </div>
           <span className="text-[10px] sm:text-[11px] font-semibold text-[#8fb39a] mt-1 truncate block">
             Normalized pace
-          </span>
-        </div>
-
-        {/* Metric 4 */}
-        <div
-          className={`p-3 sm:p-4 rounded-2xl border transition-colors shadow-sm min-w-0 max-w-full overflow-hidden flex flex-col justify-between ${
-            isDark ? 'bg-[#17171a] border-[#26262b]' : 'bg-white border-[#e5e3dc]'
-          }`}
-        >
-          <span className={`text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider truncate block ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            Shared Members
-          </span>
-          <div className={`text-base sm:text-xl lg:text-2xl font-black font-mono tracking-tight mt-1 truncate block max-w-full ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            {isLoading ? <Skeleton className="h-6 sm:h-7 w-16 sm:w-24 my-1" /> : `${householdMembers?.length || 2} Active`}
-          </div>
-          <span className="text-[10px] sm:text-[11px] font-semibold text-[#c9b27c] mt-1 inline-flex items-center gap-1 truncate">
-            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-            <span className="truncate">Admin verified</span>
           </span>
         </div>
       </div>

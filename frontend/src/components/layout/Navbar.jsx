@@ -57,7 +57,7 @@ export default function Navbar() {
                 </span>
               </div>
               <p className="text-[11px] text-[#8a8a93] hidden md:block">
-                Quiet Luxury Personal Finance
+                Structure Your Spend. Elevate Your Wealth.
               </p>
             </div>
           </button>

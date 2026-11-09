@@ -32,7 +32,7 @@ export default function ShakaHeader() {
             </span>
           </h1>
           <p className="text-xs text-neutral-400 dark:text-[#8a8a93]">
-            Quiet Luxury Shared Finance • 8 Modular Screens • JetBrains Mono Numerics
+            Structure Your Spend. Elevate Your Wealth.
           </p>
         </div>
       </div>
