@@ -26,7 +26,14 @@ export default function OfflineBanner() {
 
   if (showRestored) {
     return (
-      <div className="w-full bg-emerald-950/80 border-b border-emerald-500/30 text-emerald-300 px-4 py-2 text-xs flex items-center justify-center gap-2 backdrop-blur-md animate-fade-in z-50">
+      <div
+        className="w-full bg-emerald-950/80 border-b border-emerald-500/30 text-emerald-300 px-4 py-2 text-xs flex items-center justify-center gap-2 backdrop-blur-md animate-fade-in z-50"
+        style={{
+          paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+          paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+          paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+        }}
+      >
         <Wifi className="w-4 h-4 text-emerald-400" />
         <span className="font-medium">Connection Restored — You are back online.</span>
       </div>
@@ -36,7 +43,15 @@ export default function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <aside aria-label="Network status banner" className="w-full bg-[#1e1b13]/95 border-b border-[#c9b27c]/40 text-[#ecd9aa] px-4 py-2 text-xs flex items-center justify-between gap-3 backdrop-blur-md z-50 shadow-sm animate-fade-in">
+    <aside
+      aria-label="Network status banner"
+      className="w-full bg-[#1e1b13]/95 border-b border-[#c9b27c]/40 text-[#ecd9aa] px-4 py-2 text-xs flex items-center justify-between gap-3 backdrop-blur-md z-50 shadow-sm animate-fade-in"
+      style={{
+        paddingTop: 'calc(0.5rem + env(safe-area-inset-top, 0px))',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+      }}
+    >
       <div className="flex items-center gap-2.5 mx-auto">
         <span className="relative flex h-2.5 w-2.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#eab308] opacity-75"></span>

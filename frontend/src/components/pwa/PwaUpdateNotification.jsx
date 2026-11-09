@@ -17,7 +17,14 @@ export default function PwaUpdateNotification() {
   };
 
   return (
-    <div className="fixed bottom-20 md:bottom-6 right-4 left-4 md:left-auto md:max-w-md z-50 animate-slide-up">
+    <div
+      className="fixed z-50 md:bottom-6 md:right-6 md:left-auto md:max-w-md animate-slide-up"
+      style={{
+        bottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))',
+        left: 'max(1rem, env(safe-area-inset-left, 0px))',
+        right: 'max(1rem, env(safe-area-inset-right, 0px))',
+      }}
+    >
       <div
         className={`p-4 rounded-2xl border shadow-2xl backdrop-blur-md flex items-center justify-between gap-3.5 transition-all ${
           isDark

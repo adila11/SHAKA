@@ -205,6 +205,11 @@ export default function AddExpenseModal() {
             ? 'bg-[#17171a] border-[#26262b] text-[#e8e8ea]'
             : 'bg-white border-[#e5e3dc] text-[#18181b]'
         }`}
+        style={{
+          paddingBottom: 'max(1.25rem, calc(1.25rem + env(safe-area-inset-bottom, 0px)))',
+          paddingLeft: 'max(1.25rem, env(safe-area-inset-left, 0px))',
+          paddingRight: 'max(1.25rem, env(safe-area-inset-right, 0px))',
+        }}
       >
         {/* Mobile Drag Indicator */}
         <div

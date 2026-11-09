@@ -16,51 +16,58 @@ export default function MobileNav() {
 
   return (
     <nav
-      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-lg px-4 h-16 flex items-center justify-between pb-safe transition-colors ${
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-40 border-t backdrop-blur-lg transition-colors ${
         isDark
           ? 'bg-[#17171a]/95 border-[#26262b]'
           : 'bg-white/95 border-[#e5e3dc]'
       }`}
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+        paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+      }}
     >
-      {navItems.map((item) => {
-        if (item.isAction) {
+      <div className="h-16 flex items-center justify-between w-full">
+        {navItems.map((item) => {
+          if (item.isAction) {
+            return (
+              <div key={item.id} className="flex-1 flex justify-center -mt-6">
+                <button
+                  type="button"
+                  onClick={() => setCurrentScreen('add-expense')}
+                  className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 flex items-center justify-center shadow-lg shadow-[#c9b27c]/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
+                  aria-label="Add Expense"
+                >
+                  <Plus className="w-6 h-6 stroke-[2.5]" />
+                </button>
+              </div>
+            );
+          }
+
+          const Icon = item.icon;
+          const isActive = currentScreen === item.id;
+
           return (
-            <div key={item.id} className="flex-1 flex justify-center -mt-6">
-              <button
-                type="button"
-                onClick={() => setCurrentScreen('add-expense')}
-                className="w-12 h-12 rounded-full bg-gradient-to-tr from-[#c9b27c] to-[#a68d55] text-neutral-950 flex items-center justify-center shadow-lg shadow-[#c9b27c]/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer"
-                aria-label="Add Expense"
-              >
-                <Plus className="w-6 h-6 stroke-[2.5]" />
-              </button>
-            </div>
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setCurrentScreen(item.id)}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-colors cursor-pointer ${
+                isActive
+                  ? 'text-[#c9b27c]'
+                  : isDark
+                  ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
+                  : 'text-[#71717a] hover:text-[#18181b]'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>
+                {item.label}
+              </span>
+            </button>
           );
-        }
-
-        const Icon = item.icon;
-        const isActive = currentScreen === item.id;
-
-        return (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setCurrentScreen(item.id)}
-            className={`flex-1 flex flex-col items-center justify-center gap-1 py-1 transition-colors cursor-pointer ${
-              isActive
-                ? 'text-[#c9b27c]'
-                : isDark
-                ? 'text-[#8a8a93] hover:text-[#e8e8ea]'
-                : 'text-[#71717a] hover:text-[#18181b]'
-            }`}
-          >
-            <Icon className="w-5 h-5" />
-            <span className={`text-[10px] ${isActive ? 'font-bold' : 'font-medium'}`}>
-              {item.label}
-            </span>
-          </button>
-        );
-      })}
+        })}
+      </div>
     </nav>
   );
 }
