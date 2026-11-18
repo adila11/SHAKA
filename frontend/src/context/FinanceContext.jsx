@@ -4,38 +4,13 @@ import { DEFAULT_AVAILABLE_CATEGORIES } from '../data/financeData';
 import { pathToScreen, screenToPath, LOCATION_CHANGE_EVENT } from '../router/routerUtils';
 import { useToast } from './ToastContext';
 import { parseApiError } from '../utils/errorHandler';
+import {
+  sortTransactionsNewestFirst,
+  isTransactionToday,
+  deduplicateTransactions,
+} from '../utils/transactionUtils';
 
 const FinanceContext = createContext();
-
-// Helper to sort transactions descending (newest first)
-const sortTransactionsNewestFirst = (list) => {
-  if (!Array.isArray(list)) return [];
-  return [...list].sort((a, b) => {
-    if (a.time === 'Just now' && b.time !== 'Just now') return -1;
-    if (b.time === 'Just now' && a.time !== 'Just now') return 1;
-    const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-    const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-    if (timeA && timeB && timeA !== timeB) return timeB - timeA;
-    const dateA = new Date(a.fullDate || a.date).getTime();
-    const dateB = new Date(b.fullDate || b.date).getTime();
-    if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) return dateB - dateA;
-    return 0;
-  });
-};
-
-// Helper to prevent duplicate entries
-const deduplicateTransactions = (list) => {
-  if (!Array.isArray(list)) return [];
-  const seen = new Set();
-  const deduped = [];
-  for (const item of list) {
-    if (item && item.id && !seen.has(item.id)) {
-      seen.add(item.id);
-      deduped.push(item);
-    }
-  }
-  return deduped;
-};
 
 export function FinanceProvider({ children }) {
   // Authentication status states: 'INITIALIZING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SERVER_UNAVAILABLE'
@@ -534,45 +509,15 @@ export function FinanceProvider({ children }) {
     return Number(((totalSpent / monthlyLimit) * 100).toFixed(1));
   }, [totalSpent, monthlyLimit]);
 
-  // Today's spend calculation (matching current day, dynamic date format, or 'Just now')
+  // Today's spend calculation (strictly matches today's expenses)
   const todaySpent = useMemo(() => {
-    const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    const monthStr = todayMonths[now.getMonth()];
-    const day = now.getDate();
-    const dayPadded = String(day).padStart(2, '0');
     return transactions
-      .filter(t => {
-        if (t.type === 'income') return false;
-        if (t.time === 'Just now') return true;
-        const d = (t.date || '').toLowerCase();
-        return (
-          d.includes(`${monthStr.toLowerCase()} ${day}`) ||
-          d.includes(`${monthStr.toLowerCase()} ${dayPadded}`) ||
-          d.includes(`${day} ${monthStr.toLowerCase()}`) ||
-          d.includes(`${dayPadded} ${monthStr.toLowerCase()}`)
-        );
-      })
+      .filter(t => isTransactionToday(t))
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
   }, [transactions]);
 
   const todayLogsCount = useMemo(() => {
-    const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const now = new Date();
-    const monthStr = todayMonths[now.getMonth()];
-    const day = now.getDate();
-    const dayPadded = String(day).padStart(2, '0');
-    return transactions.filter(t => {
-      if (t.type === 'income') return false;
-      if (t.time === 'Just now') return true;
-      const d = (t.date || '').toLowerCase();
-      return (
-        d.includes(`${monthStr.toLowerCase()} ${day}`) ||
-        d.includes(`${monthStr.toLowerCase()} ${dayPadded}`) ||
-        d.includes(`${day} ${monthStr.toLowerCase()}`) ||
-        d.includes(`${dayPadded} ${monthStr.toLowerCase()}`)
-      );
-    }).length;
+    return transactions.filter(t => isTransactionToday(t)).length;
   }, [transactions]);
 
   // Category breakdown for charts and budget calculations
@@ -632,8 +577,8 @@ export function FinanceProvider({ children }) {
       createdAt: new Date().toISOString(),
     };
 
-    // 1. Optimistic UI update: Immediately insert transaction at top
-    setTransactions(prev => [optimisticTx, ...prev]);
+    // 1. Optimistic UI update: Immediately insert transaction sorted
+    setTransactions(prev => sortTransactionsNewestFirst([optimisticTx, ...prev]));
     setIsAddExpenseModalOpen(false);
 
     try {

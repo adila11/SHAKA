@@ -16,25 +16,40 @@ export const getDashboardSummary = async (req, res, next) => {
     const remainingLimit = Math.max(0, monthlyLimit - totalSpent);
     const percentSpent = monthlyLimit > 0 ? Number(((totalSpent / monthlyLimit) * 100).toFixed(1)) : 0;
 
-    const todayMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const now = new Date();
-    const currentMonthName = todayMonths[now.getMonth()];
-    const currentDay = now.getDate();
-    const todayStr = `${currentMonthName} ${currentDay}`;
-    const todayStrPadded = `${currentMonthName} ${String(currentDay).padStart(2, '0')}`;
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-    const todayLogs = expenseTxs.filter(
-      t => {
-        if (t.time === 'Just now') return true;
-        const d = (t.date || '').toLowerCase();
-        return (
-          d.includes(todayStr.toLowerCase()) ||
-          d.includes(todayStrPadded.toLowerCase()) ||
-          d.includes(`${currentDay} ${currentMonthName.toLowerCase()}`) ||
-          d.includes(`${String(currentDay).padStart(2, '0')} ${currentMonthName.toLowerCase()}`)
-        );
+    const MONTH_MAP = {
+      jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+      jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+    };
+
+    const getTxCalTime = (tx) => {
+      if (!tx) return 0;
+      if (tx.fullDate) {
+        const d = new Date(tx.fullDate);
+        if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
       }
-    );
+      const rawStr = tx.fullDate || tx.date;
+      if (rawStr && typeof rawStr === 'string') {
+        const isoMatch = rawStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+        if (isoMatch) return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10)).getTime();
+        const match = rawStr.match(/([a-zA-Z]+)\s*(\d{1,2})(?:,?\s*(\d{4}))?/);
+        if (match) {
+          const m = MONTH_MAP[match[1].toLowerCase().slice(0, 3)];
+          const d = parseInt(match[2], 10);
+          const y = match[3] ? parseInt(match[3], 10) : (tx.createdAt ? new Date(tx.createdAt).getFullYear() : now.getFullYear());
+          if (m !== undefined && !isNaN(d)) return new Date(y, m, d).getTime();
+        }
+      }
+      if (tx.createdAt) {
+        const d = new Date(tx.createdAt);
+        if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      }
+      return 0;
+    };
+
+    const todayLogs = expenseTxs.filter(t => getTxCalTime(t) === todayMidnight);
     const todaySpent = todayLogs.reduce((sum, t) => sum + Number(t.amount || 0), 0);
     const todayLogsCount = todayLogs.length;
 

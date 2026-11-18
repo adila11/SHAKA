@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Search, Filter } from 'lucide-react';
 import CategoryBadge from '../components/common/CategoryBadge';
 import { Skeleton } from '../components/common/Skeleton';
@@ -6,6 +6,7 @@ import { useFinance } from '../context/FinanceContext';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 import { useSearchParams } from '../router/routerUtils';
+import { sortTransactionsNewestFirst } from '../utils/transactionUtils';
 
 export default function LedgerPage() {
   const { transactions, totalSpent, setCurrentScreen, availableCategories, isLoading, shortMonth, currentYear } = useFinance();
@@ -32,13 +33,16 @@ export default function LedgerPage() {
     setSearchParams(nextParams, { replace: true });
   };
 
-  const filteredTransactions = transactions.filter((tx) => {
-    const matchesSearch =
-      tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      tx.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || tx.category.toLowerCase() === selectedCategory.toLowerCase();
-    return matchesSearch && matchesCategory;
-  });
+  const filteredTransactions = useMemo(() => {
+    const list = transactions.filter((tx) => {
+      const matchesSearch =
+        tx.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        tx.category.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesCategory = selectedCategory === 'All' || tx.category.toLowerCase() === selectedCategory.toLowerCase();
+      return matchesSearch && matchesCategory;
+    });
+    return sortTransactionsNewestFirst(list);
+  }, [transactions, searchQuery, selectedCategory]);
 
   return (
     <div className="space-y-6 w-full">

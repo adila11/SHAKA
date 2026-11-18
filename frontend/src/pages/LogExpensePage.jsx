@@ -18,6 +18,7 @@ import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../data/financeData';
 import CategoryBadge from '../components/common/CategoryBadge';
 import ExpenseAuthorizationModal from '../components/modals/ExpenseAuthorizationModal';
+import { sortTransactionsNewestFirst, isTransactionToday } from '../utils/transactionUtils';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -155,49 +156,15 @@ export default function LogExpensePage() {
     };
   }, []);
 
-  // Sort expenses strictly from newest to oldest (Top-to-Bottom ordering)
+  // Sort expenses strictly from newest to oldest (Date descending, then latest added on top)
   const sortedTransactions = useMemo(() => {
-    const unique = [];
-    const seen = new Set();
-    for (const t of transactions) {
-      if (t && t.id && !seen.has(t.id)) {
-        seen.add(t.id);
-        unique.push(t);
-      }
-    }
-
-    return unique.sort((a, b) => {
-      // 1. Newly created item with "Just now" always appears at the very top
-      if (a.time === 'Just now' && b.time !== 'Just now') return -1;
-      if (b.time === 'Just now' && a.time !== 'Just now') return 1;
-
-      // 2. Sort by createdAt ISO timestamp descending
-      const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
-      if (timeA && timeB && timeA !== timeB) return timeB - timeA;
-
-      // 3. Sort by fullDate / date descending
-      const dateA = new Date(a.fullDate || a.date).getTime();
-      const dateB = new Date(b.fullDate || b.date).getTime();
-      if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) return dateB - dateA;
-
-      return 0;
-    });
+    return sortTransactionsNewestFirst(transactions);
   }, [transactions]);
 
-  // Exclusively display today's transactions (newest first, no extra filter needed)
+  // Exclusively display today's transactions (newest first)
   const todayTransactions = useMemo(() => {
-    const now = new Date();
-    return sortedTransactions.filter(t => {
-      if (t.time === 'Just now') return true;
-      if (t.date === todayFormatted.shortDate || t.fullDate === todayFormatted.fullDate) return true;
-      if (t.createdAt) {
-        const cd = new Date(t.createdAt);
-        if (cd.toDateString() === now.toDateString()) return true;
-      }
-      return false;
-    });
-  }, [sortedTransactions, todayFormatted]);
+    return sortedTransactions.filter(t => isTransactionToday(t));
+  }, [sortedTransactions]);
 
   // Aggregate today's metrics
   const todayTotalSpent = useMemo(() => {
@@ -584,7 +551,7 @@ export default function LogExpensePage() {
                         <p className={`text-xs font-bold truncate ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
                           {tx.description}
                         </p>
-                        {tx.time === 'Just now' && (
+                        {(tx.isOptimistic || (tx.time === 'Just now' && isTransactionToday(tx))) && (
                           <span className="text-[8px] font-bold px-1.5 py-0.2 rounded-full bg-[#8fb39a]/20 text-[#8fb39a] border border-[#8fb39a]/40 shrink-0">
                             New
                           </span>

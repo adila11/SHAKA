@@ -306,6 +306,7 @@ export const dbStore = {
   // TRANSACTIONS
   transactions: {
     find: async (filter = {}) => {
+      let list = [];
       if (isDbConnected()) {
         const query = {};
         if (filter.category && filter.category !== 'All') {
@@ -323,39 +324,69 @@ export const dbStore = {
             { category: { $regex: filter.search, $options: 'i' } },
           ];
         }
-        const list = await Transaction.find(query).sort({ createdAt: -1 }).lean();
-        return list.map(({ _id, __v, ...t }) => t);
+        const dbList = await Transaction.find(query).lean();
+        list = dbList.map(({ _id, __v, ...t }) => t);
+      } else {
+        list = [...memState.transactions];
+        if (filter.category && filter.category !== 'All') {
+          list = list.filter(t => t.category.toLowerCase() === filter.category.toLowerCase());
+        }
+        if (filter.type) {
+          list = list.filter(t => (t.type || 'expense') === filter.type);
+        }
+        if (filter.isSplit !== undefined) {
+          list = list.filter(t => t.isSplit === filter.isSplit);
+        }
+        if (filter.search) {
+          const q = filter.search.toLowerCase();
+          list = list.filter(
+            t =>
+              t.description.toLowerCase().includes(q) ||
+              t.category.toLowerCase().includes(q)
+          );
+        }
       }
 
-      let list = [...memState.transactions];
-      if (filter.category && filter.category !== 'All') {
-        list = list.filter(t => t.category.toLowerCase() === filter.category.toLowerCase());
-      }
-      if (filter.type) {
-        list = list.filter(t => (t.type || 'expense') === filter.type);
-      }
-      if (filter.isSplit !== undefined) {
-        list = list.filter(t => t.isSplit === filter.isSplit);
-      }
-      if (filter.search) {
-        const q = filter.search.toLowerCase();
-        list = list.filter(
-          t =>
-            t.description.toLowerCase().includes(q) ||
-            t.category.toLowerCase().includes(q)
-        );
-      }
+      // Sort transactions strictly:
+      // Primary: Date descending (newest date at top, oldest at bottom)
+      // Secondary: For same date, latest added (createdAt) at top, first added at bottom
+      const MONTH_MAP = {
+        jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+        jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+      };
 
-      // Ensure newest expenses always appear first
+      const getTxCalTime = (tx) => {
+        if (!tx) return 0;
+        if (tx.fullDate) {
+          const d = new Date(tx.fullDate);
+          if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        }
+        const rawStr = tx.fullDate || tx.date;
+        if (rawStr && typeof rawStr === 'string') {
+          const isoMatch = rawStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+          if (isoMatch) return new Date(parseInt(isoMatch[1], 10), parseInt(isoMatch[2], 10) - 1, parseInt(isoMatch[3], 10)).getTime();
+          const match = rawStr.match(/([a-zA-Z]+)\s*(\d{1,2})(?:,?\s*(\d{4}))?/);
+          if (match) {
+            const m = MONTH_MAP[match[1].toLowerCase().slice(0, 3)];
+            const d = parseInt(match[2], 10);
+            const y = match[3] ? parseInt(match[3], 10) : (tx.createdAt ? new Date(tx.createdAt).getFullYear() : new Date().getFullYear());
+            if (m !== undefined && !isNaN(d)) return new Date(y, m, d).getTime();
+          }
+        }
+        if (tx.createdAt) {
+          const d = new Date(tx.createdAt);
+          if (!isNaN(d.getTime())) return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        }
+        return 0;
+      };
+
       list.sort((a, b) => {
-        if (a.time === 'Just now' && b.time !== 'Just now') return -1;
-        if (b.time === 'Just now' && a.time !== 'Just now') return 1;
+        const dateA = getTxCalTime(a);
+        const dateB = getTxCalTime(b);
+        if (dateA !== dateB) return dateB - dateA;
         const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
         const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
         if (timeA && timeB && timeA !== timeB) return timeB - timeA;
-        const dateA = new Date(a.fullDate || a.date).getTime();
-        const dateB = new Date(b.fullDate || b.date).getTime();
-        if (!isNaN(dateA) && !isNaN(dateB) && dateA !== dateB) return dateB - dateA;
         return 0;
       });
 
