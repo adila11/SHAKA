@@ -59,6 +59,11 @@ function ProtectedRoute({ children, requiredRole = null }) {
     return <ServerUnavailableScreen onRetry={retryConnection} errorMsg={error} />;
   }
 
+  // Scenario C: Active Session + Access Code Enabled + Access Code Expired / Required
+  if (authStatus === 'ACCESS_CODE_REQUIRED') {
+    return <AccessCodePromptModal isScreenMode={true} />;
+  }
+
   if (authStatus !== 'AUTHENTICATED' || !isLoggedIn || !currentUser) {
     return <LoginPage />;
   }
@@ -81,6 +86,11 @@ function PublicRoute({ children }) {
 
   if (authStatus === 'INITIALIZING') {
     return <AuthInitializingScreen />;
+  }
+
+  // Scenario C: Active Session + Access Code Enabled + Access Code Expired / Required
+  if (authStatus === 'ACCESS_CODE_REQUIRED') {
+    return <AccessCodePromptModal isScreenMode={true} />;
   }
 
   if (authStatus === 'AUTHENTICATED' && isLoggedIn) {

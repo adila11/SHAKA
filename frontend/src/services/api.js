@@ -77,9 +77,36 @@ export async function request(endpoint, options = {}, isRetry = false) {
     const response = await fetch(`${currentBaseUrl}${endpoint}`, config);
     clearTimeout(timeoutId);
 
+    // Sliding Token Refresh: Synchronize token if server issued an updated 24h sliding token
+    const refreshedAuth = response.headers.get('Authorization') || response.headers.get('authorization');
+    if (refreshedAuth && refreshedAuth.startsWith('Bearer ')) {
+      const newToken = refreshedAuth.slice(7);
+      if (newToken) {
+        localStorage.setItem('shaka_token', newToken);
+      }
+    }
+
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
+      // 0. Access Code Lockout or Requirement (HTTP 423 Locked)
+      if (
+        (response.status === 423 || data.requiresAccessCode || data.accessCodeLocked) &&
+        endpoint !== '/auth/verify-access-code' &&
+        endpoint !== '/auth/login'
+      ) {
+        const storedSessionId = localStorage.getItem('shaka_session_id');
+        if (onRequiresAccessCodeCallback) {
+          onRequiresAccessCodeCallback(data.sessionId || storedSessionId);
+        }
+        const lockErr = new Error(data.message || 'Access code verification required. Application is locked.');
+        lockErr.status = response.status;
+        lockErr.requiresAccessCode = true;
+        lockErr.accessCodeLocked = true;
+        lockErr.data = data;
+        throw lockErr;
+      }
+
       // 1. Session expired, revoked, or unauthenticated on protected endpoint -> Trigger session expired hook
       if (
         response.status === 401 &&

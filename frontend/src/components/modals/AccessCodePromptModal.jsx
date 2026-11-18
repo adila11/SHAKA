@@ -3,8 +3,8 @@ import { ShieldCheck, Eye, EyeOff, Loader2, AlertCircle, LogOut } from 'lucide-r
 import { useFinance } from '../../context/FinanceContext';
 import { useTheme } from '../../context/ThemeContext';
 
-export default function AccessCodePromptModal() {
-  const { isAccessCodeModalOpen, setIsAccessCodeModalOpen, verifyAccessCode, logout } = useFinance();
+export default function AccessCodePromptModal({ isScreenMode = false }) {
+  const { isAccessCodeModalOpen, setIsAccessCodeModalOpen, authStatus, verifyAccessCode, logout } = useFinance();
   const { isDark } = useTheme();
 
   const [code, setCode] = useState('');
@@ -12,7 +12,13 @@ export default function AccessCodePromptModal() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  if (!isAccessCodeModalOpen) return null;
+  // If in screen mode, show whenever ACCESS_CODE_REQUIRED is active
+  // If in modal overlay mode, only show if modal is open AND not already in screen mode
+  if (isScreenMode) {
+    if (authStatus !== 'ACCESS_CODE_REQUIRED' && !isAccessCodeModalOpen) return null;
+  } else {
+    if (!isAccessCodeModalOpen || authStatus === 'ACCESS_CODE_REQUIRED') return null;
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -48,15 +54,23 @@ export default function AccessCodePromptModal() {
     logout();
   };
 
+  const wrapperClasses = isScreenMode
+    ? 'min-h-[75vh] flex items-center justify-center py-10 px-4 w-full'
+    : 'fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md transition-all p-4';
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md transition-all"
-      style={{
-        paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))',
-        paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
-        paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
-        paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
-      }}
+      className={wrapperClasses}
+      style={
+        !isScreenMode
+          ? {
+              paddingTop: 'max(1rem, env(safe-area-inset-top, 0px))',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+              paddingLeft: 'max(1rem, env(safe-area-inset-left, 0px))',
+              paddingRight: 'max(1rem, env(safe-area-inset-right, 0px))',
+            }
+          : undefined
+      }
     >
       <div
         className={`w-full max-w-md rounded-3xl p-6 sm:p-7 border shadow-2xl transition-colors min-w-0 max-w-full break-words overflow-hidden ${
@@ -70,10 +84,12 @@ export default function AccessCodePromptModal() {
             <ShieldCheck className="w-7 h-7 stroke-[2.5]" />
           </div>
           <h3 className={`text-xl font-extrabold tracking-tight ${isDark ? 'text-[#e8e8ea]' : 'text-[#18181b]'}`}>
-            Access Code Required
+            {isScreenMode ? 'Application Locked' : 'Access Code Required'}
           </h3>
           <p className={`text-xs mt-1.5 ${isDark ? 'text-[#8a8a93]' : 'text-[#71717a]'}`}>
-            Enter your secure access code to verify and continue.
+            {isScreenMode
+              ? 'Enter your 4-digit access code to unlock your 1-hour session.'
+              : 'Enter your secure access code to verify and continue.'}
           </p>
         </div>
 

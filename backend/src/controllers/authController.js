@@ -42,9 +42,9 @@ export const login = async (req, res, next) => {
     // Create unique Session ID for this authenticated session
     const sessionId = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3-day sliding session
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Primary 24-hour sliding session
 
-    // Generate 15-minute Access Token
+    // Generate 24-hour Access Token
     const token = jwt.sign(
       {
         id: user._id || user.username,
@@ -54,10 +54,10 @@ export const login = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '15m', algorithm: config.jwtAlgorithm }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm }
     );
 
-    // Generate 3-day Refresh Token
+    // Generate 24-hour Refresh Token
     const refreshToken = jwt.sign(
       {
         id: user._id || user.username,
@@ -67,8 +67,15 @@ export const login = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d', algorithm: config.jwtAlgorithm }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm }
     );
+
+    // Secondary Security: Access Code 1-Hour Lock determination
+    const isAccessCodeEnabled = Boolean(user.accessCodeEnabled);
+    // Upon fresh login with username/password, if access code security is enabled,
+    // the user must enter their 4-digit access code to unlock the application.
+    const isAccessCodeLocked = isAccessCodeEnabled;
+    const authStatus = isAccessCodeLocked ? 'ACCESS_CODE_REQUIRED' : 'AUTHENTICATED';
 
     // Store session with hashed refresh token
     const refreshTokenHash = hashToken(refreshToken);
@@ -80,6 +87,7 @@ export const login = async (req, res, next) => {
       expiresAt,
       revoked: false,
       deviceInfo: req.headers?.['user-agent'] || 'Web Browser',
+      accessCodeUnlockedUntil: null,
     };
 
     await dbStore.users.addSession(user.username, sessionData);
@@ -87,23 +95,24 @@ export const login = async (req, res, next) => {
     // Cleanup old expired/revoked sessions (fire-and-forget, non-blocking)
     dbStore.users.cleanupExpiredSessions(user.username).catch(() => {});
 
-    // Set HttpOnly refresh token cookie — this is the ONLY place the refresh token lives
+    // Set HttpOnly refresh token cookie
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: config.nodeEnv === 'production',
       sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
-      maxAge: 3 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
       success: true,
       message: 'Login successful',
       token,
-      // refreshToken intentionally NOT returned in body — it's in the HttpOnly cookie
       sessionId,
       sessionExpiresAt: expiresAt,
-      accessCodeEnabled: Boolean(user.accessCodeEnabled),
+      accessCodeEnabled: isAccessCodeEnabled,
+      accessCodeLocked: isAccessCodeLocked,
+      authStatus,
       user: {
         name: user.name || user.username,
         username: user.username,
@@ -111,7 +120,7 @@ export const login = async (req, res, next) => {
         role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
-        accessCodeEnabled: Boolean(user.accessCodeEnabled),
+        accessCodeEnabled: isAccessCodeEnabled,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },
@@ -205,7 +214,7 @@ export const signup = async (req, res, next) => {
     // Create session and tokens for instant login upon signup
     const sessionId = crypto.randomUUID();
     const now = new Date();
-    const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24-hour sliding session
 
     const token = jwt.sign(
       {
@@ -216,7 +225,7 @@ export const signup = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '15m', algorithm: config.jwtAlgorithm }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm }
     );
 
     const refreshToken = jwt.sign(
@@ -228,7 +237,7 @@ export const signup = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d', algorithm: config.jwtAlgorithm }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm }
     );
 
     const refreshTokenHash = hashToken(refreshToken);
@@ -240,6 +249,7 @@ export const signup = async (req, res, next) => {
       expiresAt,
       revoked: false,
       deviceInfo: req.headers?.['user-agent'] || 'Web Browser',
+      accessCodeUnlockedUntil: null,
     };
 
     await dbStore.users.addSession(newUser.username, sessionData);
@@ -249,17 +259,18 @@ export const signup = async (req, res, next) => {
       secure: config.nodeEnv === 'production',
       sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
-      maxAge: 3 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     return res.status(201).json({
       success: true,
       message: 'Account created successfully',
       token,
-      // refreshToken intentionally NOT returned in body — it's in the HttpOnly cookie
       sessionId,
       sessionExpiresAt: expiresAt,
       accessCodeEnabled: false,
+      accessCodeLocked: false,
+      authStatus: 'AUTHENTICATED',
       user: {
         name: newUser.name || newUser.username,
         username: newUser.username,
@@ -317,12 +328,12 @@ export const refresh = async (req, res, next) => {
       });
     }
 
-    // Verify 3-day inactivity window
+    // Verify 24-hour inactivity window
     if (new Date(session.expiresAt) <= new Date()) {
       await dbStore.users.revokeSession(user.username, session.sessionId);
       return res.status(401).json({
         success: false,
-        message: 'Session expired. Please log in again.',
+        message: 'Session expired due to 24 hours of inactivity. Please log in again.',
         sessionExpired: true,
       });
     }
@@ -346,17 +357,24 @@ export const refresh = async (req, res, next) => {
       });
     }
 
-    // If access code authentication is enabled, reauthentication requires access code
-    if (user.accessCodeEnabled) {
+    // Check 1-hour access code lock status
+    const now = new Date();
+    const isAccessCodeUnlocked =
+      session.accessCodeUnlockedUntil && new Date(session.accessCodeUnlockedUntil) > now;
+    const isAccessCodeLocked = Boolean(user.accessCodeEnabled) && !isAccessCodeUnlocked;
+
+    if (isAccessCodeLocked) {
       return res.status(200).json({
         success: false,
         requiresAccessCode: true,
+        accessCodeLocked: true,
+        authStatus: 'ACCESS_CODE_REQUIRED',
         sessionId: session.sessionId,
-        message: 'Access code reauthentication required for this active session.',
+        message: 'Access code verification required. Application is locked.',
       });
     }
 
-    // Rotate refresh token and slide session
+    // Rotate refresh token and slide 24-hour session
     const newAccessToken = jwt.sign(
       {
         id: user._id || user.username,
@@ -365,7 +383,7 @@ export const refresh = async (req, res, next) => {
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '15m', algorithm: config.jwtAlgorithm || 'HS256' }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newRefreshToken = jwt.sign(
@@ -376,7 +394,7 @@ export const refresh = async (req, res, next) => {
         type: 'refresh',
       },
       config.jwtRefreshSecret,
-      { expiresIn: '3d', algorithm: config.jwtAlgorithm || 'HS256' }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm || 'HS256' }
     );
 
     const newHash = hashToken(newRefreshToken);
@@ -394,7 +412,7 @@ export const refresh = async (req, res, next) => {
       secure: config.nodeEnv === 'production',
       sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
       path: '/',
-      maxAge: 3 * 24 * 60 * 60 * 1000,
+      maxAge: 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
@@ -403,16 +421,26 @@ export const refresh = async (req, res, next) => {
       refreshToken: newRefreshToken,
       sessionId: session.sessionId,
       sessionExpiresAt: expiresAt,
+      accessCodeLocked: false,
+      authStatus: 'AUTHENTICATED',
     });
   } catch (error) {
     next(error);
   }
 };
 
-// 3. Access Code Reauthentication Within an Active Session
+// 3. Access Code Reauthentication Within an Active Session (1-Hour Unlock)
 export const verifyAccessCode = async (req, res, next) => {
   try {
-    const { accessCode, sessionId } = req.body;
+    const { accessCode } = req.body;
+    let sessionId = req.body?.sessionId || req.headers['x-session-id'];
+
+    if (!sessionId && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+      try {
+        const decoded = jwt.decode(req.headers.authorization.split(' ')[1]);
+        if (decoded?.sessionId) sessionId = decoded.sessionId;
+      } catch {}
+    }
 
     if (!accessCode || !sessionId) {
       return res.status(400).json({
@@ -440,12 +468,12 @@ export const verifyAccessCode = async (req, res, next) => {
       });
     }
 
-    // Session must be within the 3-day inactivity window
+    // Primary 24-hour session validation: Must not be expired
     if (new Date(session.expiresAt) <= new Date()) {
       await dbStore.users.revokeSession(user.username, sessionId);
       return res.status(401).json({
         success: false,
-        message: 'Session expired. Access code cannot restore expired sessions. Please log in with password.',
+        message: 'Primary session expired due to 24 hours of inactivity. Access code cannot restore expired sessions. Please log in with username and password.',
         sessionExpired: true,
       });
     }
@@ -458,11 +486,11 @@ export const verifyAccessCode = async (req, res, next) => {
       });
     }
 
-    // Check if access code is configured for this admin
+    // Check if access code is configured for this account
     if (!user.accessCodeEnabled || !user.accessCodeHash) {
       return res.status(400).json({
         success: false,
-        message: 'Access code is not enabled for this admin account.',
+        message: 'Access code is not enabled for this account.',
       });
     }
 
@@ -508,52 +536,36 @@ export const verifyAccessCode = async (req, res, next) => {
       });
     }
 
-    // On Success: Reset lockout attempts, slide 3-day session, issue new 24h access token
+    // On Success: Reset lockout attempts
     await dbStore.users.resetFailedAccessCodeAttempts(user.username);
-    const { expiresAt } = await dbStore.users.touchSessionActivity(user.username, sessionId);
 
+    // CRITICAL: Unlock application for 1 hour.
+    // The access code must NOT extend or refresh the primary 24-hour authentication session!
+    const accessCodeUnlockedUntil = new Date(Date.now() + 60 * 60 * 1000); // Exactly 1 hour
+    await dbStore.users.setSessionAccessCodeUnlock(user.username, sessionId, accessCodeUnlockedUntil);
+
+    // Generate a fresh 24h access token for subsequent API calls
     const newAccessToken = jwt.sign(
       {
         id: user._id || user.username,
         username: user.username,
+        role: user.role || 'Member',
         sessionId,
         type: 'access',
       },
       config.jwtSecret,
-      { expiresIn: '15m', algorithm: config.jwtAlgorithm || 'HS256' }
+      { expiresIn: '24h', algorithm: config.jwtAlgorithm || 'HS256' }
     );
-
-    const newRefreshToken = jwt.sign(
-      {
-        id: user._id || user.username,
-        username: user.username,
-        sessionId,
-        type: 'refresh',
-      },
-      config.jwtRefreshSecret,
-      { expiresIn: '3d', algorithm: config.jwtAlgorithm || 'HS256' }
-    );
-
-    const newHash = hashToken(newRefreshToken);
-    await dbStore.users.updateSession(user.username, sessionId, {
-      refreshTokenHash: newHash,
-    });
-
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: config.nodeEnv === 'production',
-      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax',
-      path: '/',
-      maxAge: 3 * 24 * 60 * 60 * 1000,
-    });
 
     res.status(200).json({
       success: true,
-      message: 'Access code verified successfully. Active session renewed.',
+      message: 'Access code verified successfully. Application unlocked for 1 hour.',
       token: newAccessToken,
-      refreshToken: newRefreshToken,
       sessionId,
-      sessionExpiresAt: expiresAt,
+      sessionExpiresAt: session.expiresAt, // Unchanged 24-hour expiration
+      accessCodeUnlockedUntil,
+      accessCodeLocked: false,
+      authStatus: 'AUTHENTICATED',
       user: {
         username: user.username,
         accessCodeEnabled: true,
@@ -585,10 +597,19 @@ export const enableAccessCode = async (req, res, next) => {
       accessCodeHash: hashedCode,
     });
 
+    const unlockUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const sessionId = req.session?.sessionId;
+    if (sessionId) {
+      await dbStore.users.setSessionAccessCodeUnlock(req.user.username, sessionId, unlockUntil);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Access code security successfully enabled for your account.',
       accessCodeEnabled: true,
+      accessCodeLocked: false,
+      accessCodeUnlockedUntil: unlockUntil,
+      authStatus: 'AUTHENTICATED',
     });
   } catch (error) {
     next(error);
@@ -640,10 +661,19 @@ export const changeAccessCode = async (req, res, next) => {
       accessCodeHash: hashedCode,
     });
 
+    const unlockUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const sessionId = req.session?.sessionId;
+    if (sessionId) {
+      await dbStore.users.setSessionAccessCodeUnlock(req.user.username, sessionId, unlockUntil);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Access code successfully updated.',
       accessCodeEnabled: true,
+      accessCodeLocked: false,
+      accessCodeUnlockedUntil: unlockUntil,
+      authStatus: 'AUTHENTICATED',
     });
   } catch (error) {
     next(error);
@@ -684,10 +714,17 @@ export const disableAccessCode = async (req, res, next) => {
       accessCodeHash: null,
     });
 
+    const sessionId = req.session?.sessionId;
+    if (sessionId) {
+      await dbStore.users.setSessionAccessCodeUnlock(req.user.username, sessionId, null);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Access code security successfully disabled.',
       accessCodeEnabled: false,
+      accessCodeLocked: false,
+      authStatus: 'AUTHENTICATED',
     });
   } catch (error) {
     next(error);
@@ -736,10 +773,19 @@ export const resetAccessCode = async (req, res, next) => {
       accessCodeHash: hashedCode,
     });
 
+    const unlockUntil = new Date(Date.now() + 60 * 60 * 1000);
+    const sessionId = req.session?.sessionId;
+    if (sessionId) {
+      await dbStore.users.setSessionAccessCodeUnlock(req.user.username, sessionId, unlockUntil);
+    }
+
     res.status(200).json({
       success: true,
       message: 'Access code has been reset and enabled successfully.',
       accessCodeEnabled: true,
+      accessCodeLocked: false,
+      accessCodeUnlockedUntil: unlockUntil,
+      authStatus: 'AUTHENTICATED',
     });
   } catch (error) {
     next(error);
@@ -754,8 +800,15 @@ export const getSessionInfo = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Active session not found' });
     }
 
-    const remainingMs = Math.max(0, new Date(session.expiresAt).getTime() - Date.now());
+    const now = new Date();
+    const remainingMs = Math.max(0, new Date(session.expiresAt).getTime() - now.getTime());
     const remainingHours = Number((remainingMs / (1000 * 60 * 60)).toFixed(1));
+
+    const isAccessCodeEnabled = Boolean(req.user.accessCodeEnabled);
+    const accessCodeUnlockedUntil = session.accessCodeUnlockedUntil ? new Date(session.accessCodeUnlockedUntil) : null;
+    const isAccessCodeUnlocked = accessCodeUnlockedUntil && accessCodeUnlockedUntil > now;
+    const isAccessCodeLocked = isAccessCodeEnabled && !isAccessCodeUnlocked;
+    const accessCodeRemainingMs = isAccessCodeUnlocked ? Math.max(0, accessCodeUnlockedUntil.getTime() - now.getTime()) : 0;
 
     res.status(200).json({
       success: true,
@@ -766,7 +819,11 @@ export const getSessionInfo = async (req, res, next) => {
         expiresAt: session.expiresAt,
         remainingMs,
         remainingHours,
-        accessCodeEnabled: Boolean(req.user.accessCodeEnabled),
+        accessCodeEnabled: isAccessCodeEnabled,
+        accessCodeLocked: isAccessCodeLocked,
+        accessCodeUnlockedUntil,
+        accessCodeRemainingMs,
+        authStatus: isAccessCodeLocked ? 'ACCESS_CODE_REQUIRED' : 'AUTHENTICATED',
         username: req.user.username,
         deviceInfo: session.deviceInfo,
       },
@@ -814,7 +871,6 @@ export const getMe = async (req, res, next) => {
       });
     }
 
-    // authMiddleware already fetched and attached req.user
     const user = req.user || (await dbStore.users.findByUsername(username));
 
     if (!user) {
@@ -825,8 +881,20 @@ export const getMe = async (req, res, next) => {
       });
     }
 
+    const session = req.session;
+    const now = new Date();
+    const isAccessCodeEnabled = Boolean(user.accessCodeEnabled);
+    const isAccessCodeUnlocked = session?.accessCodeUnlockedUntil && new Date(session.accessCodeUnlockedUntil) > now;
+    const isAccessCodeLocked = isAccessCodeEnabled && !isAccessCodeUnlocked;
+    const authStatus = isAccessCodeLocked ? 'ACCESS_CODE_REQUIRED' : 'AUTHENTICATED';
+
     res.status(200).json({
       success: true,
+      authStatus,
+      accessCodeLocked: isAccessCodeLocked,
+      accessCodeUnlockedUntil: session?.accessCodeUnlockedUntil || null,
+      sessionExpiresAt: session?.expiresAt || null,
+      sessionId: session?.sessionId || null,
       user: {
         name: user.name || user.username,
         username: user.username,
@@ -834,7 +902,7 @@ export const getMe = async (req, res, next) => {
         role: user.role || 'Member',
         profileImage: user.profileImage || user.avatar || 'profile1',
         avatar: user.profileImage || user.avatar || 'profile1',
-        accessCodeEnabled: Boolean(user.accessCodeEnabled),
+        accessCodeEnabled: isAccessCodeEnabled,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       },

@@ -26,6 +26,10 @@ const sessionSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    accessCodeUnlockedUntil: {
+      type: Date,
+      default: null,
+    },
     deviceInfo: {
       type: String,
       default: '',

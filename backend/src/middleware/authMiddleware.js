@@ -22,7 +22,6 @@ export const protect = async (req, res, next) => {
     decoded = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      // Decode without verification to inspect sessionId — one DB read to check session validity
       const unverified = jwt.decode(token);
       if (unverified && unverified.sessionId) {
         const user = await dbStore.users.findBySessionId(unverified.sessionId, { lean: true });
@@ -30,7 +29,7 @@ export const protect = async (req, res, next) => {
         if (session && !session.revoked && new Date(session.expiresAt) > new Date()) {
           return res.status(401).json({
             success: false,
-            message: 'Access token expired. Reauthentication or refresh required.',
+            message: 'Access token expired. Refresh required.',
             tokenExpired: true,
             sessionId: unverified.sessionId,
             accessCodeEnabled: Boolean(user.accessCodeEnabled),
@@ -39,7 +38,7 @@ export const protect = async (req, res, next) => {
       }
       return res.status(401).json({
         success: false,
-        message: 'Session expired. Please log in again.',
+        message: 'Session expired due to 24 hours of inactivity. Please log in again.',
         sessionExpired: true,
       });
     }
@@ -51,7 +50,7 @@ export const protect = async (req, res, next) => {
   }
 
   try {
-    // Single DB read: look up by sessionId (indexed) instead of username
+    // 1. Validate primary 24-hour session from database
     const user = await dbStore.users.findBySessionId(decoded.sessionId, { lean: true });
     if (!user) {
       return res.status(401).json({
@@ -61,10 +60,7 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Validate session
     const session = user.sessions?.find(s => s.sessionId === decoded.sessionId);
-
-    // If session not found or revoked
     if (!session || session.revoked) {
       return res.status(401).json({
         success: false,
@@ -73,25 +69,52 @@ export const protect = async (req, res, next) => {
       });
     }
 
-    // Validate 3-day inactivity expiration
+    // Validate 24-hour inactivity expiration
     const now = new Date();
     if (new Date(session.expiresAt) <= now) {
-      // Fire and forget revocation — don't block the response
       dbStore.users.revokeSession(user.username, decoded.sessionId).catch(() => {});
       return res.status(401).json({
         success: false,
-        message: 'Session expired. Please log in again.',
+        message: 'Session expired due to 24 hours of inactivity. Please log in again.',
         sessionExpired: true,
       });
     }
 
-    // Sliding Session Expiration: fire-and-forget (non-blocking)
-    // Don't await — the response is not blocked by the session touch
+    // 2. Sliding 24-Hour Session Expiration: Reset 24-hour inactivity countdown
     const touchPromise = dbStore.users.touchSessionActivity(user.username, decoded.sessionId);
     touchPromise.then(({ expiresAt, lastActivityAt }) => {
       session.lastActivityAt = lastActivityAt;
       session.expiresAt = expiresAt;
-    }).catch(() => {}); // Silently ignore touch failures
+    }).catch(() => {});
+
+    // Synchronize token expiration: If token age > 15 minutes, issue fresh 24h token in response header
+    const tokenAgeSec = Math.floor(now.getTime() / 1000) - (decoded.iat || 0);
+    if (tokenAgeSec > 15 * 60) {
+      try {
+        const refreshedToken = jwt.sign(
+          {
+            id: user._id || user.username,
+            username: user.username,
+            role: user.role || 'Member',
+            sessionId: decoded.sessionId,
+            type: 'access',
+          },
+          config.jwtSecret,
+          { expiresIn: '24h', algorithm: 'HS256' }
+        );
+        res.setHeader('Authorization', `Bearer ${refreshedToken}`);
+      } catch {
+        // Fallback silently if header cannot be set
+      }
+    }
+
+    // 3. Secondary Security: Access Code 1-Hour Application Lock Check
+    const isAccessCodeEnabled = Boolean(user.accessCodeEnabled);
+    const isAccessCodeUnlocked =
+      session.accessCodeUnlockedUntil && new Date(session.accessCodeUnlockedUntil) > now;
+    const isAccessCodeLocked = isAccessCodeEnabled && !isAccessCodeUnlocked;
+
+    session.isAccessCodeLocked = isAccessCodeLocked;
 
     // Attach safe user and session to request
     const safeUser = { ...user };
@@ -100,6 +123,28 @@ export const protect = async (req, res, next) => {
 
     req.user = safeUser;
     req.session = session;
+
+    // If application is locked by access code, allow only access code resolution & profile check routes
+    if (isAccessCodeLocked) {
+      const allowedPaths = [
+        '/api/auth/me',
+        '/api/auth/session-info',
+        '/api/auth/verify-access-code',
+        '/api/auth/logout',
+        '/api/health',
+      ];
+      const isAllowed = allowedPaths.some(p => req.originalUrl?.startsWith(p) || req.path?.startsWith(p));
+      if (!isAllowed) {
+        return res.status(423).json({
+          success: false,
+          requiresAccessCode: true,
+          accessCodeLocked: true,
+          sessionId: session.sessionId,
+          message: 'Access code verification required. Application is locked.',
+        });
+      }
+    }
+
     next();
   } catch (error) {
     next(error);

@@ -13,7 +13,7 @@ import {
 const FinanceContext = createContext();
 
 export function FinanceProvider({ children }) {
-  // Authentication status states: 'INITIALIZING' | 'AUTHENTICATED' | 'UNAUTHENTICATED' | 'SERVER_UNAVAILABLE'
+  // Authentication status states: 'INITIALIZING' | 'AUTHENTICATED' | 'ACCESS_CODE_REQUIRED' | 'UNAUTHENTICATED' | 'SERVER_UNAVAILABLE'
   const [authStatus, setAuthStatus] = useState(() => {
     if (typeof localStorage !== 'undefined' && !localStorage.getItem('shaka_token') && !localStorage.getItem('shaka_session_id')) {
       return 'UNAUTHENTICATED';
@@ -73,7 +73,7 @@ export function FinanceProvider({ children }) {
   const [isAddExpenseModalOpen, setIsAddExpenseModalOpen] = useState(false);
 
   // Derived authenticated state
-  const isLoggedIn = authStatus === 'AUTHENTICATED' && currentUser !== null;
+  const isLoggedIn = (authStatus === 'AUTHENTICATED' || authStatus === 'ACCESS_CODE_REQUIRED') && currentUser !== null;
 
   // Access Code Security & Session Management state
   const [sessionInfo, setSessionInfo] = useState(null);
@@ -268,19 +268,39 @@ export function FinanceProvider({ children }) {
       const res = await api.auth.getMe();
       if (res && res.success && res.user) {
         setCurrentUser(res.user);
-        setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
-        setAuthStatus('AUTHENTICATED');
+        const accessCodeEnabled = Boolean(res.user.accessCodeEnabled);
+        setIsAccessCodeEnabled(accessCodeEnabled);
         setIsBackendConnected(true);
-        // Load data in background without blocking screen transition
-        refreshData({ showLoading: false, full: true });
-        fetchSessionInfo();
+
+        if (res.sessionExpiresAt) {
+          localStorage.setItem('shaka_session_expires_at', res.sessionExpiresAt);
+        }
+        if (res.accessCodeUnlockedUntil) {
+          localStorage.setItem('shaka_access_code_unlocked_until', res.accessCodeUnlockedUntil);
+        }
+
+        // Secondary Security Gate: Check if 1-Hour Access Code verification is required
+        if (res.authStatus === 'ACCESS_CODE_REQUIRED' || res.accessCodeLocked) {
+          setAuthStatus('ACCESS_CODE_REQUIRED');
+          setIsAccessCodeModalOpen(true);
+        } else {
+          setAuthStatus('AUTHENTICATED');
+          setIsAccessCodeModalOpen(false);
+          // Load data in background without blocking screen transition
+          refreshData({ showLoading: false, full: true });
+          fetchSessionInfo();
+        }
       } else {
         clearLocalAuthData();
         setCurrentUser(null);
         setAuthStatus('UNAUTHENTICATED');
       }
     } catch (err) {
-      if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
+      if (err.status === 423 || err.requiresAccessCode || err.accessCodeLocked) {
+        setIsBackendConnected(true);
+        setAuthStatus('ACCESS_CODE_REQUIRED');
+        setIsAccessCodeModalOpen(true);
+      } else if (err.status === 401 || err.errorCode === 'UNAUTHORIZED') {
         clearLocalAuthData();
         setCurrentUser(null);
         setAuthStatus('UNAUTHENTICATED');
@@ -299,6 +319,117 @@ export function FinanceProvider({ children }) {
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  // Independent 1-Hour Access Code Lock Timer & 24-Hour Primary Session Timer
+  useEffect(() => {
+    if (authStatus !== 'AUTHENTICATED' || !currentUser) return;
+
+    let lockTimeoutId = null;
+    let sessionTimeoutId = null;
+
+    // 1. Check 1-Hour Access Code Expiration
+    if (isAccessCodeEnabled) {
+      const storedUnlockUntil =
+        (sessionInfo?.accessCodeUnlockedUntil ? new Date(sessionInfo.accessCodeUnlockedUntil).getTime() : null) ||
+        (localStorage.getItem('shaka_access_code_unlocked_until') ? new Date(localStorage.getItem('shaka_access_code_unlocked_until')).getTime() : null);
+
+      if (storedUnlockUntil) {
+        const lockRemainingMs = storedUnlockUntil - Date.now();
+        if (lockRemainingMs <= 0) {
+          setAuthStatus('ACCESS_CODE_REQUIRED');
+          setIsAccessCodeModalOpen(true);
+        } else {
+          lockTimeoutId = setTimeout(() => {
+            setAuthStatus('ACCESS_CODE_REQUIRED');
+            setIsAccessCodeModalOpen(true);
+          }, lockRemainingMs);
+        }
+      }
+    }
+
+    // 2. Check 24-Hour Primary Session Expiration
+    const storedSessionExpiry =
+      (sessionInfo?.expiresAt ? new Date(sessionInfo.expiresAt).getTime() : null) ||
+      (localStorage.getItem('shaka_session_expires_at') ? new Date(localStorage.getItem('shaka_session_expires_at')).getTime() : null);
+
+    if (storedSessionExpiry) {
+      const sessionRemainingMs = storedSessionExpiry - Date.now();
+      if (sessionRemainingMs <= 0) {
+        clearLocalAuthData();
+        setCurrentUser(null);
+        setAuthStatus('UNAUTHENTICATED');
+        setSessionExpiryNotice('Session expired due to 24 hours of inactivity. Please log in again.');
+        setCurrentScreen('login');
+      } else {
+        sessionTimeoutId = setTimeout(() => {
+          clearLocalAuthData();
+          setCurrentUser(null);
+          setAuthStatus('UNAUTHENTICATED');
+          setSessionExpiryNotice('Session expired due to 24 hours of inactivity. Please log in again.');
+          setCurrentScreen('login');
+        }, sessionRemainingMs);
+      }
+    }
+
+    return () => {
+      if (lockTimeoutId) clearTimeout(lockTimeoutId);
+      if (sessionTimeoutId) clearTimeout(sessionTimeoutId);
+    };
+  }, [authStatus, currentUser, isAccessCodeEnabled, sessionInfo, clearLocalAuthData, setCurrentScreen]);
+
+  // Primary Session Expiry Check when in ACCESS_CODE_REQUIRED (Locked)
+  useEffect(() => {
+    if (authStatus !== 'ACCESS_CODE_REQUIRED') return;
+
+    const storedSessionExpiry =
+      (sessionInfo?.expiresAt ? new Date(sessionInfo.expiresAt).getTime() : null) ||
+      (localStorage.getItem('shaka_session_expires_at') ? new Date(localStorage.getItem('shaka_session_expires_at')).getTime() : null);
+
+    if (storedSessionExpiry) {
+      const remainingMs = storedSessionExpiry - Date.now();
+      if (remainingMs <= 0) {
+        clearLocalAuthData();
+        setCurrentUser(null);
+        setIsAccessCodeModalOpen(false);
+        setAuthStatus('UNAUTHENTICATED');
+        setSessionExpiryNotice('Primary session expired. Please log in with username and password.');
+        setCurrentScreen('login');
+        return;
+      }
+
+      const timerId = setTimeout(() => {
+        clearLocalAuthData();
+        setCurrentUser(null);
+        setIsAccessCodeModalOpen(false);
+        setAuthStatus('UNAUTHENTICATED');
+        setSessionExpiryNotice('Primary session expired. Please log in with username and password.');
+        setCurrentScreen('login');
+      }, remainingMs);
+
+      return () => clearTimeout(timerId);
+    }
+  }, [authStatus, sessionInfo, clearLocalAuthData, setCurrentScreen]);
+
+  // Multi-Tab Synchronization via localStorage storage event
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'shaka_token') {
+        if (!e.newValue) {
+          // Another tab logged out
+          setCurrentUser(null);
+          setAuthStatus('UNAUTHENTICATED');
+          setIsAccessCodeModalOpen(false);
+          setCurrentScreen('login');
+        } else if (authStatus === 'UNAUTHENTICATED') {
+          // Another tab logged in
+          initializeAuth();
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [authStatus, initializeAuth, setCurrentScreen]);
 
   // Health check worker: unauthenticated health check that does NOT slide user session
   const checkHealth = useCallback(async () => {
@@ -950,9 +1081,6 @@ export function FinanceProvider({ children }) {
         if (res.token) {
           localStorage.setItem('shaka_token', res.token);
         }
-        if (res.refreshToken) {
-          localStorage.setItem('shaka_refresh_token', res.refreshToken);
-        }
         if (res.sessionId) {
           localStorage.setItem('shaka_session_id', res.sessionId);
         }
@@ -964,11 +1092,20 @@ export function FinanceProvider({ children }) {
           setIsAccessCodeEnabled(Boolean(res.user.accessCodeEnabled));
         }
         setSessionExpiryNotice(null);
-        setAuthStatus('AUTHENTICATED');
-        setCurrentScreen('dashboard');
-        await refreshData({ showLoading: true });
-        await fetchSessionInfo();
-        return { success: true };
+
+        // Secondary Security Gate: If Access Code Security is enabled, lock until code entered
+        if (res.accessCodeLocked || res.authStatus === 'ACCESS_CODE_REQUIRED') {
+          setAuthStatus('ACCESS_CODE_REQUIRED');
+          setIsAccessCodeModalOpen(true);
+          return { success: true, requiresAccessCode: true };
+        } else {
+          setAuthStatus('AUTHENTICATED');
+          setIsAccessCodeModalOpen(false);
+          setCurrentScreen('dashboard');
+          await refreshData({ showLoading: true });
+          await fetchSessionInfo();
+          return { success: true };
+        }
       }
       return { success: false, message: res.message || 'Login failed' };
     } catch (err) {
@@ -1126,6 +1263,9 @@ export function FinanceProvider({ children }) {
       const res = await api.auth.enableAccessCode({ accessCode });
       if (res.success) {
         setIsAccessCodeEnabled(true);
+        if (res.accessCodeUnlockedUntil) {
+          localStorage.setItem('shaka_access_code_unlocked_until', res.accessCodeUnlockedUntil);
+        }
         await fetchSessionInfo();
       }
       return res;
@@ -1138,6 +1278,9 @@ export function FinanceProvider({ children }) {
     try {
       const res = await api.auth.changeAccessCode({ currentAccessCode, newAccessCode });
       if (res.success) {
+        if (res.accessCodeUnlockedUntil) {
+          localStorage.setItem('shaka_access_code_unlocked_until', res.accessCodeUnlockedUntil);
+        }
         await fetchSessionInfo();
       }
       return res;
@@ -1151,6 +1294,7 @@ export function FinanceProvider({ children }) {
       const res = await api.auth.disableAccessCode({ accessCode, password });
       if (res.success) {
         setIsAccessCodeEnabled(false);
+        localStorage.removeItem('shaka_access_code_unlocked_until');
         await fetchSessionInfo();
       }
       return res;
@@ -1164,6 +1308,9 @@ export function FinanceProvider({ children }) {
       const res = await api.auth.resetAccessCode({ password, newAccessCode });
       if (res.success) {
         setIsAccessCodeEnabled(true);
+        if (res.accessCodeUnlockedUntil) {
+          localStorage.setItem('shaka_access_code_unlocked_until', res.accessCodeUnlockedUntil);
+        }
         await fetchSessionInfo();
       }
       return res;
@@ -1180,17 +1327,29 @@ export function FinanceProvider({ children }) {
 
     try {
       const res = await api.auth.verifyAccessCode({ accessCode, sessionId });
-      if (res.success && res.token) {
-        localStorage.setItem('shaka_token', res.token);
-        if (res.refreshToken) {
-          localStorage.setItem('shaka_refresh_token', res.refreshToken);
+      if (res.success) {
+        if (res.token) {
+          localStorage.setItem('shaka_token', res.token);
+        }
+        if (res.accessCodeUnlockedUntil) {
+          localStorage.setItem('shaka_access_code_unlocked_until', res.accessCodeUnlockedUntil);
         }
         setIsAccessCodeModalOpen(false);
+        setAuthStatus('AUTHENTICATED');
         await fetchSessionInfo();
+        await refreshData({ showLoading: false, full: true });
         return { success: true };
       }
       return { success: false, message: res.message || 'Verification failed' };
     } catch (err) {
+      if (err.data?.sessionExpired) {
+        clearLocalAuthData();
+        setCurrentUser(null);
+        setIsAccessCodeModalOpen(false);
+        setAuthStatus('UNAUTHENTICATED');
+        setSessionExpiryNotice('Primary session expired. Please log in with username and password.');
+        setCurrentScreen('login');
+      }
       return {
         success: false,
         message: err.data?.message || err.message || 'Invalid access code',

@@ -172,7 +172,7 @@ export const dbStore = {
     },
     touchSessionActivity: async (username, sessionId) => {
       const now = new Date();
-      const expiresAt = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000); // 3-day sliding window
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24-hour sliding window
       if (isDbConnected()) {
         await User.updateOne(
           { username, 'sessions.sessionId': sessionId },
@@ -193,6 +193,25 @@ export const dbStore = {
         }
       }
       return { lastActivityAt: now, expiresAt };
+    },
+    setSessionAccessCodeUnlock: async (username, sessionId, unlockedUntil) => {
+      if (isDbConnected()) {
+        await User.updateOne(
+          { username, 'sessions.sessionId': sessionId },
+          {
+            $set: {
+              'sessions.$.accessCodeUnlockedUntil': unlockedUntil,
+            },
+          }
+        );
+      }
+      const user = memState.users.find(u => u.username.toLowerCase() === username.toLowerCase());
+      if (user && user.sessions) {
+        const sess = user.sessions.find(s => s.sessionId === sessionId);
+        if (sess) {
+          sess.accessCodeUnlockedUntil = unlockedUntil;
+        }
+      }
     },
     revokeSession: async (username, sessionId) => {
       if (isDbConnected()) {
